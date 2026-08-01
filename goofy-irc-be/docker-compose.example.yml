@@ -1,0 +1,13 @@
+services:
+  goofy_irc_be:
+    container_name: goofy_irc_be
+    build:
+      context: .
+    environment:
+      SPRING_PROFILES_ACTIVE: "prod"
+      CERT_DOMAIN: "your.domain.com"
+      KEYSTORE_PASSWORD: "change-me-to-a-strong-password"
+    volumes:
+      - "/etc/letsencrypt:/etc/letsencrypt"
+      - "./irc_data:/srv/data"
+    restart: always
