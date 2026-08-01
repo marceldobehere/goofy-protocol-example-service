@@ -69,7 +69,7 @@ public class IrcOpenApiCustomizer implements OperationCustomizer {
 
             // Get the Error Detail Fields
             String[] detailFieldsArr = BaseClassIrcException.detailFieldsFor(exType);
-            Map<String, Object> detailFields = Arrays.stream(detailFieldsArr).collect(Collectors.toMap(f -> f, f -> "..."));
+            Map<String, Object> detailFields = Arrays.stream(detailFieldsArr).collect(Collectors.toMap(f -> f, _ -> "..."));
 
             // Use The IrcErrorDto as the Schema base, since it doesn't get used we have to explicitly force it
             Schema schema = ModelConverters.getInstance().read(IrcErrorDto.class).get("IrcErrorDto");

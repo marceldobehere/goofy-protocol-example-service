@@ -22,6 +22,9 @@ public class CachedKeyHandleEntry {
     @Column(nullable = false, length = FieldSize.HANDLE_LEN)
     private String handle;
 
+    @Column
+    private String handleDomain;
+
     @Column(nullable = false)
     private Instant createdAt;
 }

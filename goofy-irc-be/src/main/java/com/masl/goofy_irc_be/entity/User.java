@@ -24,11 +24,6 @@ public class User {
     @ColumnDefault("false")
     private boolean admin;
 
-    // Puts the user in a read only mode temporarily, for example if the user is being reported or investigated
-    @Column(nullable = false)
-    @ColumnDefault("false")
-    private boolean restricted;
-
     // Used in the Redirect Endpoints
     @Column
     private String customFrontendUrl;
@@ -49,7 +44,6 @@ public class User {
         return "User{" +
                 "handle='" + handle + '\'' +
                 ", admin=" + admin +
-                ", restricted=" + restricted +
                 '}';
     }
 }

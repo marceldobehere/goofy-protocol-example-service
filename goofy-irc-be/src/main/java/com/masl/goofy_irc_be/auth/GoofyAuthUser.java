@@ -14,13 +14,9 @@ import java.security.Principal;
 public class GoofyAuthUser implements Principal {
     private String handle;
 
-    private Boolean identity;
-
     private Boolean user;
 
     private Boolean admin;
-
-    private Boolean restricted;
 
     private SignedRequest signedRequest;
 

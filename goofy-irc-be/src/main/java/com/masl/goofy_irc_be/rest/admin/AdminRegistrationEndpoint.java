@@ -38,7 +38,7 @@ public class AdminRegistrationEndpoint {
         return registrationService.getAllRequests().stream()
                 .map(req -> new RegisterRequestEntryDto(
                         req.getId(),
-                        req.getMesssage(),
+                        req.getMessage(),
                         req.getGeneralContact(),
                         req.getOptEmail(),
                         req.getCreatedAt(),
@@ -54,7 +54,7 @@ public class AdminRegistrationEndpoint {
         return registrationService.getAllUnresolvedRequests().stream()
                 .map(req -> new RegisterRequestEntryDto(
                         req.getId(),
-                        req.getMesssage(),
+                        req.getMessage(),
                         req.getGeneralContact(),
                         req.getOptEmail(),
                         req.getCreatedAt(),
@@ -70,7 +70,7 @@ public class AdminRegistrationEndpoint {
         var req = registrationService.getRequestById(id);
         return new RegisterRequestEntryDto(
                 req.getId(),
-                req.getMesssage(),
+                req.getMessage(),
                 req.getGeneralContact(),
                 req.getOptEmail(),
                 req.getCreatedAt(),

@@ -59,7 +59,7 @@ public class HandleHelper implements HandleCryptoHelper {
 
     @Override
     public boolean addPersistedKeyToHandleMapping(String pubSplitKey, String handle) {
-        cachedKeyHandleRepository.save(new CachedKeyHandleEntry(pubSplitKey, handle, Instant.now()));
+        cachedKeyHandleRepository.save(new CachedKeyHandleEntry(pubSplitKey, handle, null, Instant.now()));
         return true;
     }
 

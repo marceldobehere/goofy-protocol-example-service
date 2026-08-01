@@ -18,7 +18,7 @@ public class RegistrationRequest {
     private Long id;
 
     @Column(nullable = false, length = FieldSize.NORMAL_TEXT_LEN)
-    private String messsage;
+    private String message;
 
     @Column(nullable = false, length = FieldSize.SHORT_TEXT_LEN)
     private String generalContact;

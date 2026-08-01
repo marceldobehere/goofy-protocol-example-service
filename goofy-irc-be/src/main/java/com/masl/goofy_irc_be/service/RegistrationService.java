@@ -7,6 +7,8 @@ import com.masl.goofy_irc_be.exception.client.GenericNotFound;
 import com.masl.goofy_irc_be.exception.client.HandleAlreadyRegistered;
 import com.masl.goofy_irc_be.exception.client.InvalidRegisterCode;
 import com.masl.goofy_irc_be.exception.client.RegistrationCodeAlreadyUsed;
+import com.masl.goofy_irc_be.properties.RegisterProperties;
+import com.masl.goofy_irc_be.repository.CachedKeyHandleRepository;
 import com.masl.goofy_irc_be.repository.RegistrationCodeRepository;
 import com.masl.goofy_irc_be.repository.RegistrationRequestRepository;
 import com.masl.goofy_irc_be.repository.UserRepository;
@@ -22,13 +24,17 @@ import java.util.UUID;
 public class RegistrationService {
     private static final Logger log = LoggerFactory.getLogger(RegistrationService.class);
 
+    private final RegisterProperties registerProperties;
     private final RegistrationCodeRepository registrationCodeRepository;
     private final RegistrationRequestRepository registrationRequestRepository;
+    private final CachedKeyHandleRepository cachedKeyHandleRepository;
     private final UserRepository userRepository;
 
-    public RegistrationService(RegistrationCodeRepository registrationCodeRepository, RegistrationRequestRepository registrationRequestRepository, UserRepository userRepository) {
+    public RegistrationService(RegisterProperties registerProperties, RegistrationCodeRepository registrationCodeRepository, RegistrationRequestRepository registrationRequestRepository, CachedKeyHandleRepository cachedKeyHandleRepository, UserRepository userRepository) {
+        this.registerProperties = registerProperties;
         this.registrationCodeRepository = registrationCodeRepository;
         this.registrationRequestRepository = registrationRequestRepository;
+        this.cachedKeyHandleRepository = cachedKeyHandleRepository;
         this.userRepository = userRepository;
     }
 
@@ -85,11 +91,15 @@ public class RegistrationService {
         registrationCodeRepository.save(regCode);
     }
 
-    // Synchronized should hopefully be enough to avoid race conditions, since the backend will only really use one instance.
-    // (Future) TODO: Make Code Safe from Race Conditions when scaling
     synchronized public void attemptRegistration(String code, GoofyAuthUser auth) throws InvalidRegisterCode, HandleAlreadyRegistered, RegistrationCodeAlreadyUsed {
+        boolean regCodeRequired = true;
+        CachedKeyHandleEntry entry = cachedKeyHandleRepository.findByHandle(auth.getHandle());
+        if (entry != null && entry.getHandleDomain() != null)
+            regCodeRequired = !registerProperties.getAllowedDomains().contains(entry.getHandleDomain());
+
+        // Get Code if needed
         RegistrationCode regCode = getValidCode(code);
-        if (regCode == null)
+        if (regCodeRequired && regCode == null)
             throw new InvalidRegisterCode(code);
 
         // Check if Handle is already registered
@@ -100,18 +110,19 @@ public class RegistrationService {
         User user = new User();
         user.setHandle(auth.getHandle());
         user.setPubSplitKey(auth.getSignedRequest().pubSplitKey());
-        user.setAdmin(regCode.getAdmin());
+        user.setAdmin(regCode != null && regCode.getAdmin());
         userRepository.save(user);
 
-        // Use Code
-        useCode(code, user);
+        // Use Code if needed
+        if (regCode != null)
+            useCode(code, user);
         log.info("User {} registered successfully with code {}", user.getHandle(), code);
     }
 
     public void submitRegistrationRequest(RegistrationRequestDto requestDto, String handle) {
         log.info("Received Registration Request: {}", requestDto);
         RegistrationRequest request = new RegistrationRequest();
-        request.setMesssage(requestDto.getMessage());
+        request.setMessage(requestDto.getMessage());
         request.setGeneralContact(requestDto.getContact());
         request.setOptEmail(requestDto.getOptEmail());
         request.setCreatedAt(Instant.now());
