@@ -8,6 +8,7 @@ import com.masl.goofy_irc_be.exception.client.HandleAlreadyRegistered;
 import com.masl.goofy_irc_be.exception.client.InvalidRegisterCode;
 import com.masl.goofy_irc_be.exception.client.RegistrationCodeAlreadyUsed;
 import com.masl.goofy_irc_be.exception.client.RegistrationNotAllowed;
+import com.masl.goofy_irc_be.exception.server.PublicKeyLookupFailed;
 import com.masl.goofy_irc_be.properties.RegisterProperties;
 import com.masl.goofy_irc_be.service.RegistrationService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,11 +31,13 @@ public class RegistrationEndpoint {
 
     // TODO: Rate Limit?
     @PostMapping
-    @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY') and not hasRole('ROLE_REGISTERED_USER')")
+    @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
     @IrcEndpoint(summary = "Attempt Registration", description = "To register, a registration code is required (It can be left blank IF the handle comes from a domain, which is in the `autoAllowDomains` list). The request needs to be signed with the keypair that wants to register.")
-    public String register(@Valid @RequestBody String code, @AuthenticationPrincipal GoofyAuthUser auth) throws RegistrationNotAllowed, InvalidRegisterCode, HandleAlreadyRegistered, RegistrationCodeAlreadyUsed {
+    public String register(@RequestBody(required = false) String code, @AuthenticationPrincipal GoofyAuthUser auth) throws RegistrationNotAllowed, InvalidRegisterCode, HandleAlreadyRegistered, RegistrationCodeAlreadyUsed, PublicKeyLookupFailed {
         if (!registerProperties.getRegistrationsAllowed())
             throw new RegistrationNotAllowed();
+        if (code == null)
+            code = "";
 
         registrationService.attemptRegistration(code, auth);
         return "Successfully registered user with handle: " + auth.getHandle();

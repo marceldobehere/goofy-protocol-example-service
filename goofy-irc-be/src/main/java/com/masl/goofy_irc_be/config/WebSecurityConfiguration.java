@@ -87,7 +87,7 @@ public class WebSecurityConfiguration {
                     .requestMatchers("/").permitAll() // Redirect to Frontend
                     .requestMatchers("/api/general/**").permitAll() // General Info of IRC Server
                     .requestMatchers("/api/register/**").permitAll() // Registration of Users
-//                    .requestMatchers("/api/user/**").permitAll() // User Info, Lookup, Export, etc.
+                    .requestMatchers("/api/user/**").permitAll() // User Info
                     .requestMatchers("/api/redirect/**").permitAll() // Redirect Links for Service Login/Config/Access
                     .requestMatchers("/api/admin/**").hasRole(ROLES.ADMIN)
                     .anyRequest().hasRole(ROLES.ADMIN);

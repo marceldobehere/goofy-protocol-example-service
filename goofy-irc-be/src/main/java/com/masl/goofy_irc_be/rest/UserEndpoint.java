@@ -31,7 +31,7 @@ public class UserEndpoint {
 
     // Get My User Info (Handle, Public Key, Auth Role, ...)
     @GetMapping("/info")
-    @PreAuthorize("hasRole('ROLE_REGISTERED_IDENTITY')")
+    @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
     @IrcEndpoint(summary = "Gets Information for the current User", description = "This Endpoint returns information about the current user/identity, including their handle, public key, and authentication role.")
     public MyUserInfoDto myInfo(@AuthenticationPrincipal GoofyAuthUser auth) {
         if (auth.getUser()) {

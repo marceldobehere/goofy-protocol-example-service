@@ -1,4 +1,4 @@
-# Goofy IRC (Goofy Protocol Example Service)
+# Goofy IRC Backend (Goofy Protocol Example Service)
 
 WIP Example of a Service using the [Goofy Protocol](https://github.com/marceldobehere/goofy-protocol).
 

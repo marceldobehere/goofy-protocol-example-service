@@ -85,6 +85,52 @@ public class HandleHelper implements HandleCryptoHelper {
         return resMap;
     }
 
+    public HandleLookupDto attemptLookup(String handle) {
+        return attemptLookup(handle, 0);
+    }
+
+    // TODO: Test
+    private HandleLookupDto attemptLookup(String handle, int cDepth) {
+        if (cDepth > 10) {
+            log.warn("Max lookup depth reached for handle {} at depth {}", handle, cDepth);
+            return null;
+        }
+
+        String strippedHandle = GenericHandleCrypto.stripPotentialDomainFromHandle(handle);
+        String optDomain = GenericHandleCrypto.getPotentialDomainFromHandle(handle);
+
+        // Unknown
+        if (optDomain == null)
+            return null;
+
+        log.debug("Attempting to look up handle {} at domain {}", strippedHandle, optDomain);
+        for (var protocol : supportedFisProtocols) {
+            try {
+                HandleLookupDto lookupDto = restClient.get()
+                        .uri(protocol + optDomain + "/fis-api/user/lookup/" + strippedHandle)
+                        .retrieve()
+                        .body(HandleLookupDto.class);
+
+                if (lookupDto != null && strippedHandle.equals(lookupDto.getHandle()) &&  lookupDto.getPubKey() != null && !lookupDto.getPubKey().isBlank()) {
+                    if (lookupDto.isRegisteredHere() && (lookupDto.getHandleDomain() == null || optDomain.equalsIgnoreCase(lookupDto.getHandleDomain()))) {
+                        log.debug("Successfully looked up handle {} at domain {}: {}", strippedHandle, optDomain, lookupDto.getPubKey());
+                        return lookupDto;
+                    } else if (lookupDto.getHandleDomain() != null) {
+                        log.debug("Handle is at home somewhere else, continuing lookup for handle {} at domain {}: {}", strippedHandle, optDomain, lookupDto.getHandleDomain());
+                        return attemptLookup(strippedHandle + "@" + lookupDto.getHandleDomain(), cDepth + 1);
+                    }
+                } else {
+                    log.warn("Handle {} at domain {} returned no public key", strippedHandle, optDomain);
+                }
+            } catch (RestClientException e) {
+                log.info("Failed to look up handle {} at domain {}: {}", strippedHandle, optDomain, e.getMessage());
+            } catch (Exception e) {
+                log.warn("Unexpected error while looking up handle {} at domain {}: {}", strippedHandle, optDomain, e.getMessage());
+            }
+        }
+        return null;
+    }
+
     @Override
     public String lookupPubSplitKeyForHandleExternally(String handle) {
         String strippedHandle = GenericHandleCrypto.stripPotentialDomainFromHandle(handle);
@@ -115,28 +161,7 @@ public class HandleHelper implements HandleCryptoHelper {
         }
 
         // Attempt Look up
-        log.debug("Attempting to look up handle {} at domain {}", strippedHandle, optDomain);
-        for (var protocol : supportedFisProtocols) {
-            try {
-                HandleLookupDto lookupDto = restClient.get()
-                        .uri(protocol + optDomain + "/fis-api/user/lookup/" + strippedHandle)
-                        .retrieve()
-                        .body(HandleLookupDto.class);
-
-                if (lookupDto != null && lookupDto.getPubKey() != null && !lookupDto.getPubKey().isBlank()) {
-                    log.debug("Successfully looked up handle {} at domain {}: {}", strippedHandle, optDomain, lookupDto.getPubKey());
-                    return lookupDto.getPubKey();
-                } else {
-                    log.warn("Handle {} at domain {} returned no public key", strippedHandle, optDomain);
-                }
-            } catch (RestClientException e) {
-                log.info("Failed to look up handle {} at domain {}: {}", strippedHandle, optDomain, e.getMessage());
-            } catch (Exception e) {
-                log.warn("Unexpected error while looking up handle {} at domain {}: {}", strippedHandle, optDomain, e.getMessage());
-            }
-        }
-
-        // Lookup failed
-        return null;
+        var res = attemptLookup(handle);
+        return res == null ? null : res.getPubKey();
     }
 }

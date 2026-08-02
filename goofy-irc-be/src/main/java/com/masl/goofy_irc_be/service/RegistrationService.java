@@ -7,6 +7,7 @@ import com.masl.goofy_irc_be.exception.client.GenericNotFound;
 import com.masl.goofy_irc_be.exception.client.HandleAlreadyRegistered;
 import com.masl.goofy_irc_be.exception.client.InvalidRegisterCode;
 import com.masl.goofy_irc_be.exception.client.RegistrationCodeAlreadyUsed;
+import com.masl.goofy_irc_be.exception.server.PublicKeyLookupFailed;
 import com.masl.goofy_irc_be.properties.RegisterProperties;
 import com.masl.goofy_irc_be.repository.CachedKeyHandleRepository;
 import com.masl.goofy_irc_be.repository.RegistrationCodeRepository;
@@ -91,11 +92,15 @@ public class RegistrationService {
         registrationCodeRepository.save(regCode);
     }
 
-    synchronized public void attemptRegistration(String code, GoofyAuthUser auth) throws InvalidRegisterCode, HandleAlreadyRegistered, RegistrationCodeAlreadyUsed {
-        boolean regCodeRequired = true;
+    synchronized public void attemptRegistration(String code, GoofyAuthUser auth) throws InvalidRegisterCode, HandleAlreadyRegistered, RegistrationCodeAlreadyUsed, PublicKeyLookupFailed {
         CachedKeyHandleEntry entry = cachedKeyHandleRepository.findByHandle(auth.getHandle());
-        if (entry != null && entry.getHandleDomain() != null)
-            regCodeRequired = !registerProperties.getAllowedDomains().contains(entry.getHandleDomain());
+
+        // Check if user has domain attached, only users with a domain are allowed
+        if (entry == null || entry.getHandleDomain() == null)
+            throw new PublicKeyLookupFailed(auth.getHandle());
+
+        // Check if the domain is in our auto allow list
+        boolean regCodeRequired = !registerProperties.getAllowedDomains().contains(entry.getHandleDomain());
 
         // Get Code if needed
         RegistrationCode regCode = getValidCode(code);

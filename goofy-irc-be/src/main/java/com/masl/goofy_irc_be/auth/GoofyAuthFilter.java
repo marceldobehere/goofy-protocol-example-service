@@ -1,5 +1,6 @@
 package com.masl.goofy_irc_be.auth;
 
+import com.masl.goofy_irc_be.crypto.HandleHelper;
 import com.masl.goofy_irc_be.entity.CachedKeyHandleEntry;
 import com.masl.goofy_irc_be.repository.CachedKeyHandleRepository;
 import com.masl.goofy_protocol_core.crypto.connected.GenericHandleCrypto;
@@ -41,16 +42,18 @@ public class GoofyAuthFilter extends OncePerRequestFilter {
     private final int maxRequestSizeBytes;
     private final boolean disableUniqueIdCheck;
     private final HandlerExceptionResolver resolver;
+    private final HandleHelper handleHelper;
 
     public GoofyAuthFilter(IrcHandleCrypto handleCrypto, UserRepository userRepository, CachedKeyHandleRepository cachedKeyHandleRepository, Environment env,
                            @Value("${goofy.auth.max-request-bytes}") int maxRequestBytes,
-                           @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) {
+                           @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver, HandleHelper handleHelper) {
         this.handleCrypto = handleCrypto;
         this.userRepository = userRepository;
         this.cachedKeyHandleRepository = cachedKeyHandleRepository;
         this.disableUniqueIdCheck = env.acceptsProfiles(Profiles.of("test")); // Important for Perf Testing
         this.maxRequestSizeBytes = maxRequestBytes;
         this.resolver = resolver;
+        this.handleHelper = handleHelper;
     }
 
     @Override
@@ -100,7 +103,12 @@ public class GoofyAuthFilter extends OncePerRequestFilter {
                     CachedKeyHandleEntry entry = cachedKeyHandleRepository.findByHandle(tempHandle);
                     if (entry == null) // Should always have the entry
                         throw new Exception("CachedKeyHandleEntry not found for handle: " + tempHandle);
-                    entry.setHandleDomain(tempDomain);
+
+                    var res = handleHelper.attemptLookup(tempBigHandle);
+                    if (res == null)
+                        throw new PublicKeyLookupFailed(tempHandle);
+                    if (res.getHandleDomain() != null)
+                        entry.setHandleDomain(res.getHandleDomain());
                     cachedKeyHandleRepository.save(entry);
                 }
             }
