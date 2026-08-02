@@ -28,6 +28,13 @@ public class User {
     @Column
     private String customFrontendUrl;
 
+    // TODO: Add regular checks if the attached domain of a handle is valid
+    // If the domain is NOT valid, start a "countdown"
+    // after 3 days of it not being valid, respond to signed requests with a Exception/Error "InvalidDomain" or "DomainLookupFailed"
+    // -> maybe allow data export
+    // after 15-30 days just wipe the data
+    // -> avoid data loss
+
 //    @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)
 //    private Set<IdentityStorageEntry> identityStorageEntries;
 //
