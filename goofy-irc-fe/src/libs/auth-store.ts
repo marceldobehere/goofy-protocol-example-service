@@ -10,6 +10,7 @@ import {
 } from "@/libs/crypto";
 import {IdentityStorageEntryDto, ServiceEntryDto} from "@/libs/dtos";
 import {getAuth, getFixedAuth} from "@/libs/req";
+import {basePath} from "@/libs/go-path";
 
 // This will be responsible for storing the keypair and loading it (either from SessionStorage or LocalStorage) and maybe secured with a password
 // Other files can then check if there is a keypair loaded
@@ -137,6 +138,7 @@ async function _storeStorageMode(mode: StorageMode) {
 
 // Load / Store
 async function _getStore(key: string, mode: StorageMode): Promise<string | null> {
+    key = basePath + "/" + key;
     if (mode === "LOCAL_STORAGE")
         return localStorage.getItem(key);
     else if (mode === "SESSION_STORAGE")
@@ -144,6 +146,7 @@ async function _getStore(key: string, mode: StorageMode): Promise<string | null>
     return null;
 }
 async function _setStore(key: string, value: string | null, mode: StorageMode) {
+    key = basePath + "/" + key;
     if (value == null) {
         if (mode === "LOCAL_STORAGE")
             return localStorage.removeItem(key);
