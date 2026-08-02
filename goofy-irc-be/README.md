@@ -8,7 +8,7 @@ WIP Example of a Service using the [Goofy Protocol](https://github.com/marceldob
 ## Notes
 This is still very WIP.
 
-Demo instance currently hosted here: (TODO)
+Demo instance currently hosted here: https://goofy-irc.rocc.systems
 
 ## Features
 (TODO)
