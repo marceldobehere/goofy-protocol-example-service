@@ -1,0 +1,10 @@
+.DialogContent {
+  padding: 1rem 3rem 2rem 3rem;
+  width: fit-content;
+  margin: auto;
+  min-height: 10rem;
+}
+
+.Header {
+  margin: 1rem 0;
+}

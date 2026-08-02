@@ -1,0 +1,21 @@
+.MainCont {
+  padding: 1rem;
+  width: fit-content;
+  margin: auto;
+}
+
+.Body {
+  margin: 1rem 0;
+}
+
+.Introduction {
+  margin: 1rem 0 2rem 0;
+}
+
+.MainButtons {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+}
