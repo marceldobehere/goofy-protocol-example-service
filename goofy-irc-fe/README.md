@@ -2,7 +2,7 @@
 
 WIP Example of a Service using the [Goofy Protocol](https://github.com/marceldobehere/goofy-protocol).
 
-Currently hosted here: (TODO)
+Currently hosted here: https://fe.goofy-irc.rocc.systems
 
 
 ## Get Started
