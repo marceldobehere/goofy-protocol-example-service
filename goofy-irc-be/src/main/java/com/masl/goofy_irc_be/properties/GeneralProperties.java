@@ -13,7 +13,7 @@ public class GeneralProperties {
     private String name;
     private String description;
     private String contact;
-    public final static String version = "0.2.1";
+    public final static String version = "0.3.1";
 
     public String getDomain() {
         URI uri = URI.create(url);
