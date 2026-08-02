@@ -31,7 +31,7 @@ public class RegistrationEndpoint {
     // TODO: Rate Limit?
     @PostMapping
     @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY') and not hasRole('ROLE_REGISTERED_USER')")
-    @IrcEndpoint(summary = "Attempt Registration", description = "To register, a registration code is required. The request needs to be signed with the keypair that wants to register.")
+    @IrcEndpoint(summary = "Attempt Registration", description = "To register, a registration code is required (It can be left blank IF the handle comes from a domain, which is in the `autoAllowDomains` list). The request needs to be signed with the keypair that wants to register.")
     public String register(@Valid @RequestBody String code, @AuthenticationPrincipal GoofyAuthUser auth) throws RegistrationNotAllowed, InvalidRegisterCode, HandleAlreadyRegistered, RegistrationCodeAlreadyUsed {
         if (!registerProperties.getRegistrationsAllowed())
             throw new RegistrationNotAllowed();
@@ -45,7 +45,8 @@ public class RegistrationEndpoint {
     public RegisterStatusDto registrationsAllowed() {
         return new RegisterStatusDto(
                 registerProperties.getRegistrationsAllowed(),
-                registerProperties.getCheckMethod()
+                registerProperties.getCheckMethod(),
+                registerProperties.getAllowedDomains()
         );
     }
 
