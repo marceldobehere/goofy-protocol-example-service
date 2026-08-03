@@ -29,6 +29,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -56,6 +57,56 @@ public class GoofyAuthFilter extends OncePerRequestFilter {
         this.handleHelper = handleHelper;
     }
 
+    public GoofyAuth getGoofyAuthFromSignedRequest(Map<String, String> headers, String method, String path, byte[] body) throws PublicKeyLookupFailed, InvalidSignature {
+        // Check Headers
+        if (!SignedRequest.hasAllRequestHeaders(headers))
+            throw new InvalidSignature(SignedRequest.SignedRequestValidity.MISSING_PARTS);
+
+        // Parse Request
+        SignedRequest req;
+        try {
+            req = SignedRequest.fromRequestHeaders(headers, method, path, body, handleCrypto);
+        } catch (PubSplitKeyNotFound e) {
+            throw new PublicKeyLookupFailed(e.handle);
+        }
+
+        // Extract Potential Domain
+        String tempBigHandle = headers.get("X-Goofy-Handle");
+        if (tempBigHandle != null) {
+            String tempHandle = GenericHandleCrypto.stripPotentialDomainFromHandle(tempBigHandle);
+            String tempDomain = GenericHandleCrypto.getPotentialDomainFromHandle(tempBigHandle);
+            if (tempDomain != null) {
+                CachedKeyHandleEntry entry = cachedKeyHandleRepository.findByHandle(tempHandle);
+                if (entry == null) // Should always have the entry
+                    throw new PublicKeyLookupFailed(tempHandle);
+
+                // Update Entry
+                var res = handleHelper.attemptLookup(tempBigHandle);
+                if (res == null)
+                    throw new PublicKeyLookupFailed(tempHandle);
+                if (res.getHandleDomain() != null)
+                    entry.setHandleDomain(res.getHandleDomain());
+                cachedKeyHandleRepository.save(entry);
+            }
+        }
+
+        // Check Validity
+        SignedRequest.SignedRequestValidity valid = req.isValid(handleCrypto, validator);
+        if (!valid.equals(SignedRequest.SignedRequestValidity.VALID))
+            throw new InvalidSignature(valid);
+
+        // Invalidate ID
+        if (!disableUniqueIdCheck)
+            validator.invalidateUniqueId(req.uniqueId());
+
+        // Get User Data and Create Authentication
+        User user = userRepository.findByHandle(req.handle());
+        boolean isUser = user != null;
+        boolean isAdmin = user != null && user.isAdmin();
+
+        return new GoofyAuth(req, isUser, isAdmin);
+    }
+
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)  {
         try {
@@ -71,63 +122,10 @@ public class GoofyAuthFilter extends OncePerRequestFilter {
 
             // Cache Request So body can be read without issues
             ContentCachingRequestWrapper _wrapped = new ContentCachingRequestWrapper(request, maxRequestSizeBytes);
-            byte[] body;
-            try (var in = _wrapped.getInputStream()) {
-                body = in.readNBytes(maxRequestSizeBytes + 1);
+            byte[] body = getBody(_wrapped);
 
-                // Read the remaining data without storing it
-                // This is NEEDED FOR THE RESPONSE / ERROR HANDLING TO WORK PROPERLY (don't ask me why)
-                byte[] buffer = new byte[8192];
-
-                //noinspection StatementWithEmptyBody
-                while (in.read(buffer) != -1);
-            }
-
-            if (body.length > maxRequestSizeBytes)
-                throw new ContentTooLarge();
-
-            // Parse Request
-            SignedRequest req;
-            try {
-                req = SignedRequest.fromRequestHeaders(headers, request.getMethod(), request.getRequestURI(), body, handleCrypto);
-            } catch (PubSplitKeyNotFound e) {
-                throw new PublicKeyLookupFailed(e.handle);
-            }
-
-            // Extract Potential Domain
-            String tempBigHandle = headers.get("X-Goofy-Handle");
-            if (tempBigHandle != null) {
-                String tempHandle = GenericHandleCrypto.stripPotentialDomainFromHandle(tempBigHandle);
-                String tempDomain = GenericHandleCrypto.getPotentialDomainFromHandle(tempBigHandle);
-                if (tempDomain != null) {
-                    CachedKeyHandleEntry entry = cachedKeyHandleRepository.findByHandle(tempHandle);
-                    if (entry == null) // Should always have the entry
-                        throw new Exception("CachedKeyHandleEntry not found for handle: " + tempHandle);
-
-                    var res = handleHelper.attemptLookup(tempBigHandle);
-                    if (res == null)
-                        throw new PublicKeyLookupFailed(tempHandle);
-                    if (res.getHandleDomain() != null)
-                        entry.setHandleDomain(res.getHandleDomain());
-                    cachedKeyHandleRepository.save(entry);
-                }
-            }
-
-            // Check Validity
-            SignedRequest.SignedRequestValidity valid = req.isValid(handleCrypto, validator);
-            if (!valid.equals(SignedRequest.SignedRequestValidity.VALID))
-                throw new InvalidSignature(valid);
-
-            // Invalidate ID
-            if (!disableUniqueIdCheck)
-                validator.invalidateUniqueId(req.uniqueId());
-
-            // Get User Data and Create Authentication
-            User user = userRepository.findByHandle(req.handle());
-            boolean isUser = user != null;
-            boolean isAdmin = user != null && user.isAdmin();
-
-            SecurityContextHolder.getContext().setAuthentication(new GoofyAuth(req, isUser, isAdmin));
+            // Set Auth
+            SecurityContextHolder.getContext().setAuthentication(getGoofyAuthFromSignedRequest(headers, request.getMethod(), request.getRequestURI(), body));
 
             // Fix Body for Filter
             RequestBodyContentWrapper wrapped = new RequestBodyContentWrapper(_wrapped, maxRequestSizeBytes);
@@ -140,5 +138,23 @@ public class GoofyAuthFilter extends OncePerRequestFilter {
         }
 
         SecurityContextHolder.clearContext();
+    }
+
+    private byte @NonNull [] getBody(ContentCachingRequestWrapper _wrapped) throws IOException, ContentTooLarge {
+        byte[] body;
+        try (var in = _wrapped.getInputStream()) {
+            body = in.readNBytes(maxRequestSizeBytes + 1);
+
+            // Read the remaining data without storing it
+            // This is NEEDED FOR THE RESPONSE / ERROR HANDLING TO WORK PROPERLY (don't ask me why)
+            byte[] buffer = new byte[8192];
+
+            //noinspection StatementWithEmptyBody
+            while (in.read(buffer) != -1);
+        }
+
+        if (body.length > maxRequestSizeBytes)
+            throw new ContentTooLarge();
+        return body;
     }
 }

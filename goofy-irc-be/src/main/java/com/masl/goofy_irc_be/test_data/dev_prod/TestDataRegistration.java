@@ -3,6 +3,7 @@ package com.masl.goofy_irc_be.test_data.dev_prod;
 import com.masl.goofy_irc_be.entity.RegistrationCode;
 import com.masl.goofy_irc_be.service.RegistrationService;
 import jakarta.transaction.Transactional;
+import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -24,7 +25,7 @@ public class TestDataRegistration implements CommandLineRunner {
 
     @Transactional
     @Override
-    public void run(String... args) {
+    public void run(String @NonNull ... args) {
         log.info("> Checking for existing registration codes...");
         if (registrationService.anyUsedCodesExist())  {
             log.info("> Registration codes already exist and have been used.");

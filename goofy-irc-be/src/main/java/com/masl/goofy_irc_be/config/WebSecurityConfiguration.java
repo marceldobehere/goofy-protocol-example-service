@@ -85,6 +85,7 @@ public class WebSecurityConfiguration {
                 // Default values
                 auth
                     .requestMatchers("/").permitAll() // Redirect to Frontend
+                    .requestMatchers("/api/ws").permitAll() // WebSocket Connection
                     .requestMatchers("/api/general/**").permitAll() // General Info of IRC Server
                     .requestMatchers("/api/register/**").permitAll() // Registration of Users
                     .requestMatchers("/api/user/**").permitAll() // User Info

@@ -211,6 +211,4 @@ class SignedRequestIntegrationTests {
 		// Check for correct result
 		res.andExpect(status().is4xxClientError());
 	}
-
-	// TODO: Write Test to check Multipart Behaviour, probably adapt signed request checks + DOCUMENT!!! + maybe adapt js lib
 }

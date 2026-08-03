@@ -2,6 +2,7 @@ package com.masl.goofy_irc_be.auth;
 
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletInputStream;
+import org.jspecify.annotations.NonNull;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 
 import java.io.ByteArrayInputStream;
@@ -20,7 +21,7 @@ public class RequestBodyContentWrapper extends ContentCachingRequestWrapper {
     }
 
     @Override
-    public ServletInputStream getInputStream() {
+    public @NonNull ServletInputStream getInputStream() {
         return bodyProcessorIS;
     }
 
