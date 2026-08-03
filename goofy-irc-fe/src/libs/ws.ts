@@ -13,7 +13,7 @@ const WS_PATH = "/api/ws"
 export async function getWsUrl(): Promise<string> {
     const baseUrl = await getBaseServerUrl(); // can be https://... or http://...
     if (baseUrl.startsWith("https://"))
-        return baseUrl.replace("https://", "ws://") + WS_PATH;
+        return baseUrl.replace("https://", "wss://") + WS_PATH;
     else if (baseUrl.startsWith("http://"))
         return baseUrl.replace("http://", "ws://") + WS_PATH;
     else
