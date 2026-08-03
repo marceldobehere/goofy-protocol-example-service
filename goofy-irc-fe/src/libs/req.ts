@@ -29,6 +29,8 @@ export async function _internalDoReq<T>(_path: string, method: HttpMethod, body:
     if (keypair != null) {
         const bodyVal = (body == null) ? null : ((isBodyStr || isBodyBinary) ? body : JSON.stringify(body));
         const req = await createSignedRequest(keypair, method, basePath, bodyVal as Uint8Array | string | null);
+        // TODO: If overrideDomain is not set, use the GlobalState handleDomain + if it is not set for some reason, ask the user ideally
+        // TODO: remove/disable just sending the public key here because for the service we only allow users that have are part of a valid/existing FIS.
         const reqHeaders = sendHandle ? getHeadersFromSignedRequestWithHandle(req, overrideDomain) : getHeadersFromSignedRequestWithPubkey(req);
         for (const [key, value] of reqHeaders.entries())
             headers.set(key, value);

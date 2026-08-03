@@ -8,6 +8,9 @@ import {goPath} from "@/libs/go-path";
 import {getIdentityKeypair, getServiceEntry} from "@/libs/auth-store";
 import {AsymmFullKeyPair} from "@/libs/crypto-types";
 
+
+// TODO: Add Object that has the handleDomain, which will be retrieved by asking the service
+// TODO: the Handle domain should be used for sending requests, ideally also attaching when the lookup fails instead of sending the public key
 export const GlobalState: {
     loggedIn: boolean,
     isAdmin: boolean,
