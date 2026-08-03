@@ -4,11 +4,20 @@ import styles from "./page.module.css";
 import Link from "next/link";
 import {GlobalState, useGlobalState} from "@/libs/global-state";
 import {logout} from "@/libs/auth";
+import {attachRawWsMessageHandler, initWs, sendRawWsMessage} from "@/libs/ws";
 
 export default function Page() {
-    useGlobalState(true, false, "NONE", async () => {});
+    useGlobalState(true, false, "NONE", async () => {
+        await initWs();
 
-    // TODO: Styling
+        await attachRawWsMessageHandler((msg) => {
+            console.log("WS GOT:", msg);
+        });
+
+        console.log("Sending WS: Hello from Home Page");
+        await sendRawWsMessage("Hello from Home Page");
+    });
+
     return (
         <main>
             <div className={styles.MainCont}>
