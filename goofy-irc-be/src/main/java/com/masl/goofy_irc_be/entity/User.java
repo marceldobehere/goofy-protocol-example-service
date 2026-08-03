@@ -28,7 +28,9 @@ public class User {
     @Column
     private String customFrontendUrl;
 
-    // TODO: Add regular checks if the attached domain of a handle is valid
+    // TODO: Add Property "usedRegisterCode", that specifies if the user used a register code to register.
+
+    // TODO: Add regular checks if the attached domain of a handle is valid (Only for Users that haven't registered with a register code)
     // If the domain is NOT valid, start a "countdown"
     // after 3 days of it not being valid, respond to signed requests with a Exception/Error "InvalidDomain" or "DomainLookupFailed"
     // -> maybe allow data export
