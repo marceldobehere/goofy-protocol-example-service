@@ -376,6 +376,7 @@ public class ChatRoomEndpoint {
         roomDto.setName(room.getName());
         roomDto.setDescription(room.getDescription());
         roomDto.setUserLimit(room.getUserLimit() == null ? roomProperties.getDefaultMaxUserLimit() : room.getUserLimit());
+        roomDto.setNeedsPassword(room.getRoomPasswordHash() != null);
         roomDto.setAllowGuests(room.getAllowGuests());
         roomDto.setAllowJoining(room.getAllowJoining());
         roomDto.setCreatedByHandle(room.getCreatedBy().getHandle());

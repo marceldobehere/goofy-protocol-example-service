@@ -32,6 +32,7 @@ public class ChatRoomDto {
     private Boolean allowJoining;
 
     private String roomPasswordHash;
+    private Boolean needsPassword;
 
     private Integer memberCount;
     private List<String> members;
