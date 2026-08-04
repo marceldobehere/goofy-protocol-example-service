@@ -350,7 +350,7 @@ public class ChatRoomEndpoint {
         List<ChatRoomDto.MemberStatusDto> memberStatus = new ArrayList<>();
         for (String member : members) {
             WsService.MemberStatus status = wsService.getStatus(member);
-            memberStatus.add(new ChatRoomDto.MemberStatusDto(status.isOnline(), status.isTyping()));
+            memberStatus.add(new ChatRoomDto.MemberStatusDto(status.isOnline, status.isTyping));
         }
 
         // Create DTO

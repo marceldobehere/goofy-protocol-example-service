@@ -15,7 +15,7 @@ export default function Page() {
         });
 
         console.log("Sending WS: Hello from Home Page");
-        await sendRawWsMessage("Hello from Home Page");
+        await sendRawWsMessage(JSON.stringify({evType: "SEND_MSG", roomName: "test", msgObj: JSON.stringify({message: "hi"})}));
     });
 
     // TODO: allow having multiple irc servers and then group the channels by server

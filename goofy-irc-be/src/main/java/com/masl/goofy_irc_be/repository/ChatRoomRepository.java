@@ -16,6 +16,6 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, String> {
 
     int countAllByCreatedBy_Handle(String createdByHandle);
 
-    List<ChatRoom> findAllByCreatedBy_Handle_OrMembersContaining(String createdByHandle, String members);
+    List<ChatRoom> findAllByCreatedBy_Handle_OrMembersContaining(String createdByHandle, String member);
     List<ChatRoom> findAllByAllowGuestsIsTrue();
 }
