@@ -7,9 +7,9 @@ import {logout} from "@/libs/auth";
 import {createServerManager, WsServerManager} from "@/libs/ws";
 import {useRef, useState} from "react";
 import {ChatMessageDto, ChatRoomDto, LocalChatMessage, LocalRoomData, LocalServerData, WsGenericEv, WsReceiveMsg, WsSendMsg, WsUpdateRoomData, WsUpdateTyping} from "@/libs/dtos";
-import {getBaseServerUrl} from "@/libs/auth-store";
+import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
 import {deleteAuth, getAuth, postAuth} from "@/libs/req";
-import {sha256ToText} from "@/libs/crypto";
+import {asymmSignObj, sha256ToText} from "@/libs/crypto";
 
 export default function Page() {
     const [currentMsgText, setCurrentMsgText] = useState<string>("");
@@ -69,13 +69,16 @@ export default function Page() {
         } else if (genEv.evType == "RECEIVE_MSG") {
             const msgEv = genEv as WsReceiveMsg;
 
-            // TODO: Validate + Sig Check
+            // TODO: lookup public key and check sig
+
+            // TODO: Validate
             const msg: LocalChatMessage = {
                 msgObj: JSON.parse(msgEv.msgObj),
                 handle: msgEv.senderHandle,
                 uuid: crypto.randomUUID(),
                 // eslint-disable-next-line react-hooks/purity
-                timestamp: new Date(Date.now())
+                timestamp: new Date(Date.now()),
+                sig: msgEv.sig,
             };
 
             const msgs = getOrCreateMsgListForRoom(msgEv.roomName, ws.serverUrl);
@@ -355,7 +358,7 @@ export default function Page() {
     }
 
     function renderMessage(msg: LocalChatMessage) {
-        return (<li className={styles.MainChatEntry} key={msg.uuid}><span title={msg.timestamp.toLocaleString()}>[{msg.timestamp.toLocaleTimeString()}] </span><b>{msg.handle}:</b> {msg.msgObj.msg}</li>);
+        return (<li className={styles.MainChatEntry} key={msg.uuid}><span title={msg.timestamp.toLocaleString()}>[{msg.timestamp.toLocaleTimeString()}] </span><b title={JSON.stringify(msg, null, 4)}>{msg.handle}:</b> {msg.msgObj.msg}</li>);
     }
 
     async function sendMessageToCurrentRoom() {
@@ -364,10 +367,14 @@ export default function Page() {
 
         // TODO: Add other stuff like signature, etc.
         const msg: ChatMessageDto = {
-            msg: currentMsgText.trim()
+            msg: currentMsgText.trim(),
         }
 
-        await sendToServer(currRoom.server, new WsSendMsg(currRoom.room.name, JSON.stringify(msg)));
+        // Sign msg obj
+        const keypair = await getKeypair();
+        const sig = await asymmSignObj(msg, keypair.priv);
+
+        await sendToServer(currRoom.server, new WsSendMsg(currRoom.room.name, JSON.stringify(msg), sig));
 
         setCurrentMsgText("");
     }

@@ -164,23 +164,27 @@ export class WsReceiveMsg extends WsGenericEv {
     roomName: string;
     senderHandle: string;
     msgObj: string;
+    sig: string;
 
-    constructor(roomName: string, senderHandle: string, msgObj: string) {
+    constructor(roomName: string, senderHandle: string, msgObj: string, sig: string) {
         super("RECEIVE_MSG");
         this.roomName = roomName;
         this.senderHandle = senderHandle;
         this.msgObj = msgObj;
+        this.sig = sig;
     }
 }
 
 export class WsSendMsg extends WsGenericEv {
     roomName: string;
     msgObj: string;
+    sig: string;
 
-    constructor(roomName: string, msgObj: string) {
+    constructor(roomName: string, msgObj: string, sig: string) {
         super("SEND_MSG");
         this.roomName = roomName;
         this.msgObj = msgObj;
+        this.sig = sig;
     }
 }
 
@@ -231,4 +235,5 @@ export interface LocalChatMessage {
     handle: string;
     timestamp: Date;
     uuid: string;
+    sig: string;
 }
