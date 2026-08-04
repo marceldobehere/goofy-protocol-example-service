@@ -18,6 +18,10 @@ export default function Page() {
         await sendRawWsMessage("Hello from Home Page");
     });
 
+    // TODO: allow having multiple irc servers and then group the channels by server
+    // Also store that list on the FIS
+    // TODO: have the FIS logic for data storage
+
     return (
         <main>
             <div className={styles.MainCont}>

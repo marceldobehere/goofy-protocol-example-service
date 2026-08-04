@@ -2,11 +2,16 @@ package com.masl.goofy_irc_be.rest;
 
 import com.masl.goofy_irc_be.auth.GoofyAuthUser;
 import com.masl.goofy_irc_be.config.ROLES;
+import com.masl.goofy_irc_be.dto.response.IrcHandleLookupDto;
 import com.masl.goofy_irc_be.dto.response.MyUserInfoDto;
+import com.masl.goofy_irc_be.entity.CachedKeyHandleEntry;
 import com.masl.goofy_irc_be.entity.User;
 import com.masl.goofy_irc_be.exception.base.swagger.IrcEndpoint;
+import com.masl.goofy_irc_be.exception.server.PublicKeyLookupFailed;
 import com.masl.goofy_irc_be.properties.GeneralProperties;
+import com.masl.goofy_irc_be.repository.CachedKeyHandleRepository;
 import com.masl.goofy_irc_be.repository.UserRepository;
+import com.masl.goofy_protocol_core.crypto.connected.GenericHandleCrypto;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,10 +28,12 @@ public class UserEndpoint {
 
     private final UserRepository userRepository;
     private final GeneralProperties generalProperties;
+    private final CachedKeyHandleRepository cachedKeyHandleRepository;
 
-    public UserEndpoint(UserRepository userRepository, GeneralProperties generalProperties) {
+    public UserEndpoint(UserRepository userRepository, GeneralProperties generalProperties, CachedKeyHandleRepository cachedKeyHandleRepository) {
         this.userRepository = userRepository;
         this.generalProperties = generalProperties;
+        this.cachedKeyHandleRepository = cachedKeyHandleRepository;
     }
 
     // Get My User Info (Handle, Public Key, Auth Role, ...)
@@ -49,60 +56,27 @@ public class UserEndpoint {
         userRepository.deleteByHandle(auth.getHandle());
     }
 
+    // Look Up User / Public Key Info based on Handle (Check if moved)
+    @GetMapping("/lookup/{handle}")
+    @IrcEndpoint(summary = "Looks up a User or Identity by Handle", description = "This Endpoint allows you to look up a user or identity by their handle")
+    public IrcHandleLookupDto lookupUser(@PathVariable String handle) throws PublicKeyLookupFailed {
+        String strippedHandle = GenericHandleCrypto.stripPotentialDomainFromHandle(handle);
 
+        // Check if we got it cached
+        // TODO: Check domain again?
+        CachedKeyHandleEntry entry = cachedKeyHandleRepository.findByHandle(strippedHandle);
+        if (entry == null || entry.getHandleDomain() == null) {
+            // TODO: potentially try looking up from the domains we already know
+            throw new PublicKeyLookupFailed(handle);
+        }
 
+        // TODO: Handle Moving User
+        // Check if its a user
+        User user = userRepository.findByHandle(strippedHandle);
+        if (user != null)
+            return new IrcHandleLookupDto(strippedHandle, entry.getHandleDomain(), user.getPubSplitKey(), true);
 
-//    // Look Up User / Public Key Info based on Handle (Check if moved)
-//    @GetMapping("/lookup/{handle}")
-//    @IrcEndpoint(summary = "Looks up a User or Identity by Handle", description = "This Endpoint allows you to look up a user or identity by their handle")
-//    public HandleLookupDto lookupUser(@PathVariable String handle) throws PublicKeyLookupFailed {
-//        String strippedHandle = GenericHandleCrypto.stripPotentialDomainFromHandle(handle);
-//
-//        // TODO: Handle Moving User
-//        // Check if its a user
-//        User user = userRepository.findByHandle(strippedHandle);
-//        if (user != null)
-//            return new HandleLookupDto(strippedHandle, generalProperties.getDomain(), user.getPubSplitKey(), true);
-//
-//        // TODO: Handle Moving Identity
-//        // Check if its a registered identity
-//        IdentityStorageEntry entry = identityRepository.findByHandle(strippedHandle);
-//        if (entry != null)
-//            return new HandleLookupDto(strippedHandle, generalProperties.getDomain(), entry.getPubSplitKey(), true);
-//
-//        // Try getting public key from cache/external lookup
-//        String localLookup = handleCrypto.getPublicSplitKeyFromHandle(handle);
-//        if (localLookup != null) {
-//            String optDomain = GenericHandleCrypto.getPotentialDomainFromHandle(handle);
-//            // TODO: Maybe redirect or treat a bit differently, especially if we add extra info then we need some extra method for that
-//            // but we'd also need to be careful about the registeredHere boolean
-//            return new HandleLookupDto(strippedHandle, optDomain, localLookup, false);
-//        }
-//
-//        // We don't know the handle, fail
-//        throw new PublicKeyLookupFailed(handle);
-//    }
-//
-//
-//    // Update generic User Info
-//    // - Custom Frontend URL
-//
-//    // Set/Update external Handle Information (for example the domain of the user)
-//    // Would be good to have an extra table that has every user and identity ever registered (just the handle) + information if they have moved FIS domains
-//    // Additionally support moving a singular identity handle -> shouldn't be too hard, just have to watch out in the request I guess
-//    // Additionally add a custom Fis Exception everywhere where it's needed to indicate an Identity/Account was moved
-//    // Move Account (Would be the same as update external handle information?)
-//    // Would also need to affect all identities of the user
-//
-//    // Get Storage Details / Stats
-//
-//    // Get Complete Account Export (What about Tables / Buckets)
-//    // Import FIS Data
-//    // Should maybe be a two-step process like delete, because you'd replace all your old data
-//    // For clients there'll be two options of importing an export (backup or when moving FIS), either direct import using the same keypair for registration
-//    // - or decrypting and re-encrypting everything before importing it
-//
-//    // Deactivate Handle (Highly specific, needs more thought put into it)
-//
-//    // You should also be able to move identities to a different identity, e.g. if you change your handle (because maybe you changed to a post quantum cryptography algo and now have a new keypair/identity)
+        // We know the user but they are not registered here
+        return new IrcHandleLookupDto(strippedHandle, entry.getHandleDomain(), entry.getPubSplitKey(), false);
+    }
 }

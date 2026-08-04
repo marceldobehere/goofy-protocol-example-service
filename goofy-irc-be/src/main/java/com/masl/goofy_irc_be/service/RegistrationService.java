@@ -15,6 +15,8 @@ import com.masl.goofy_irc_be.repository.RegistrationRequestRepository;
 import com.masl.goofy_irc_be.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -30,13 +32,15 @@ public class RegistrationService {
     private final RegistrationRequestRepository registrationRequestRepository;
     private final CachedKeyHandleRepository cachedKeyHandleRepository;
     private final UserRepository userRepository;
+    private final Environment env;
 
-    public RegistrationService(RegisterProperties registerProperties, RegistrationCodeRepository registrationCodeRepository, RegistrationRequestRepository registrationRequestRepository, CachedKeyHandleRepository cachedKeyHandleRepository, UserRepository userRepository) {
+    public RegistrationService(RegisterProperties registerProperties, RegistrationCodeRepository registrationCodeRepository, RegistrationRequestRepository registrationRequestRepository, CachedKeyHandleRepository cachedKeyHandleRepository, UserRepository userRepository, Environment env) {
         this.registerProperties = registerProperties;
         this.registrationCodeRepository = registrationCodeRepository;
         this.registrationRequestRepository = registrationRequestRepository;
         this.cachedKeyHandleRepository = cachedKeyHandleRepository;
         this.userRepository = userRepository;
+        this.env = env;
     }
 
     public RegistrationCode createNewRegistrationCode(boolean isAdmin) {
@@ -95,12 +99,16 @@ public class RegistrationService {
     synchronized public void attemptRegistration(String code, GoofyAuthUser auth) throws InvalidRegisterCode, HandleAlreadyRegistered, RegistrationCodeAlreadyUsed, PublicKeyLookupFailed {
         CachedKeyHandleEntry entry = cachedKeyHandleRepository.findByHandle(auth.getHandle());
 
+        // Ignore Domain in test env, but enforce register code
+        boolean testOnly = env.acceptsProfiles(Profiles.of("test"));
+
         // Check if user has domain attached, only users with a domain are allowed
         if (entry == null || entry.getHandleDomain() == null)
-            throw new PublicKeyLookupFailed(auth.getHandle());
+            if (!testOnly)
+                throw new PublicKeyLookupFailed(auth.getHandle());
 
         // Check if the domain is in our auto allow list
-        boolean regCodeRequired = !registerProperties.getAllowedDomains().contains(entry.getHandleDomain());
+        boolean regCodeRequired = testOnly || !registerProperties.getAllowedDomains().contains(entry.getHandleDomain());
 
         // Get Code if needed
         RegistrationCode regCode = getValidCode(code);

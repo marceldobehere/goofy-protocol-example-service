@@ -2,8 +2,11 @@ package com.masl.goofy_irc_be.ws;
 
 import com.masl.goofy_irc_be.auth.GoofyAuthFilter;
 import com.masl.goofy_irc_be.auth.GoofyAuthUser;
+import com.masl.goofy_irc_be.entity.CachedKeyHandleEntry;
 import com.masl.goofy_irc_be.exception.client.InvalidSignature;
 import com.masl.goofy_irc_be.exception.server.PublicKeyLookupFailed;
+import com.masl.goofy_irc_be.repository.CachedKeyHandleRepository;
+import com.masl.goofy_protocol_core.crypto.connected.request.SignedRequest;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,9 +31,11 @@ import java.util.regex.Pattern;
 public class MainWsAuthCheck implements HandshakeInterceptor {
     private static final Logger log = LoggerFactory.getLogger(MainWsAuthCheck.class);
 
+    private final CachedKeyHandleRepository cachedKeyHandleRepository;
     private final GoofyAuthFilter goofyAuthFilter;
 
-    public MainWsAuthCheck(GoofyAuthFilter goofyAuthFilter) {
+    public MainWsAuthCheck(CachedKeyHandleRepository cachedKeyHandleRepository, GoofyAuthFilter goofyAuthFilter) {
+        this.cachedKeyHandleRepository = cachedKeyHandleRepository;
         this.goofyAuthFilter = goofyAuthFilter;
     }
 
@@ -51,6 +56,13 @@ public class MainWsAuthCheck implements HandshakeInterceptor {
         try {
             // Try to authenticate
             GoofyAuthUser authUser = (GoofyAuthUser)goofyAuthFilter.getGoofyAuthFromSignedRequest(headers, request.getMethod().name(), request.getURI().getPath(), null).getPrincipal();
+            if (authUser == null)
+                throw new InvalidSignature(SignedRequest.SignedRequestValidity.MISSING_PARTS);
+
+            // Check if user has domain attached, only users with a domain are allowed
+            CachedKeyHandleEntry entry = cachedKeyHandleRepository.findByHandle(authUser.getHandle());
+            if (entry == null || entry.getHandleDomain() == null)
+                throw new PublicKeyLookupFailed(authUser.getHandle());
 
             // Store AuthUser
             attrs.put("authUser", authUser);

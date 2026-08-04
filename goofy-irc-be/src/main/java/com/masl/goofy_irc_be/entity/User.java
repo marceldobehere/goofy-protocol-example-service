@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 
+import java.util.Set;
+
 @Entity
 @Table(name = "irc_user")
 @NoArgsConstructor
@@ -24,6 +26,8 @@ public class User {
     @ColumnDefault("false")
     private boolean admin;
 
+    // TODO: Probably add some form of restricted flag? Blocks sending messages and or creating rooms
+
     // Used in the Redirect Endpoints
     @Column
     private String customFrontendUrl;
@@ -37,14 +41,8 @@ public class User {
     // after 15-30 days just wipe the data
     // -> avoid data loss
 
-//    @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)
-//    private Set<IdentityStorageEntry> identityStorageEntries;
-//
-//    @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)
-//    private Set<LoginStorageEntry> loginStorageEntries;
-//
-//    @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)
-//    private Set<ServiceEntry> serviceEntries;
+    @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)
+    private Set<ChatRoom> createdChatRooms;
 
     // TODO: On delete clear cache probably
 
