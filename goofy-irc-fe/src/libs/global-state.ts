@@ -3,10 +3,8 @@
 import {usePathname} from "next/navigation";
 import {useEffect, useState} from "react";
 import {getUserInfo} from "@/libs/auth";
-import {MyUserInfoDto, ServiceEntryDto} from "@/libs/dtos";
+import {MyUserInfoDto} from "@/libs/dtos";
 import {goPath} from "@/libs/go-path";
-import {getIdentityKeypair, getServiceEntry} from "@/libs/auth-store";
-import {AsymmFullKeyPair} from "@/libs/crypto-types";
 import {clearWsHandlers} from "@/libs/ws";
 
 
@@ -17,25 +15,11 @@ export const GlobalState: {
     isAdmin: boolean,
     handle: string | null,
     gotBaseData: boolean,
-
-    // Identity Fragment
-    identityKeypair: AsymmFullKeyPair | null,
-    identityHandle: string | null
-
-    // Service Entry
-    serviceEntry: ServiceEntryDto | null
 } = {
     loggedIn: false,
     isAdmin: false,
     handle: "",
     gotBaseData: false,
-
-    // Identity Fragment
-    identityKeypair: null,
-    identityHandle: null,
-
-    // Service Entry
-    serviceEntry: null,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
@@ -123,11 +107,6 @@ async function initGlobalState(pathName: string, needLogin: boolean, needAdmin: 
         console.debug("3> Global State: ", GlobalState);
     }
 
-    // Reset Specific Data
-    GlobalState.identityKeypair = null;
-    GlobalState.identityHandle = null;
-    GlobalState.serviceEntry = null;
-
     // Clear Handlers
     await clearWsHandlers();
 
@@ -155,45 +134,23 @@ async function initGlobalState(pathName: string, needLogin: boolean, needAdmin: 
         }
 
         if (fragment == "IDENTITY") {
-            const fragmentHandle =  window.location.hash.slice(window.location.hash.lastIndexOf("#") + 1);
-            // window.location.hash = "#" + fragmentHandle;
-
-            try {
-                GlobalState.identityKeypair = await getIdentityKeypair(fragmentHandle);
-                GlobalState.identityHandle = fragmentHandle;
-            } catch (e) {
-                if (isNetworkErrorTypeError(e)) {
-                    console.error("4> Init failed (Network Error)", e);
-                    alert("Network Error: Failed to get user info");
-                } else {
-                    console.log("4> Init failed (Identity Fragment Error)", e);
-                    alert(`Identity for ${fragmentHandle} not found`);
-                    goPath("/user/home");
-                }
-                return false;
-            }
-        } else if (fragment == "IDENTITY@SERVICE") {
-            const fragmentPart =  window.location.hash.slice(window.location.hash.lastIndexOf("#") + 1).split("@");
-            // window.location.hash = "#" + fragmentHandle;
-
-            const fragmentHandle = fragmentPart[0];
-            const fragmentUuid = fragmentPart[1];
-
-            try {
-                GlobalState.identityHandle = fragmentHandle;
-                GlobalState.identityKeypair = await getIdentityKeypair(fragmentHandle);
-                GlobalState.serviceEntry = await getServiceEntry(GlobalState.identityKeypair, fragmentUuid);
-            } catch (e) {
-                if (isNetworkErrorTypeError(e)) {
-                    console.error("4> Init failed (Network Error)", e);
-                    alert("Network Error: Failed to get user info");
-                } else {
-                    console.log("4> Init failed (Identity Fragment & Service Error)", e);
-                    alert(`Identity for ${fragmentHandle} not found`);
-                    goPath("/user/home");
-                }
-                return false;
-            }
+            // const fragmentHandle =  window.location.hash.slice(window.location.hash.lastIndexOf("#") + 1);
+            // // window.location.hash = "#" + fragmentHandle;
+            //
+            // try {
+            //     GlobalState.identityKeypair = await getIdentityKeypair(fragmentHandle);
+            //     GlobalState.identityHandle = fragmentHandle;
+            // } catch (e) {
+            //     if (isNetworkErrorTypeError(e)) {
+            //         console.error("4> Init failed (Network Error)", e);
+            //         alert("Network Error: Failed to get user info");
+            //     } else {
+            //         console.log("4> Init failed (Identity Fragment Error)", e);
+            //         alert(`Identity for ${fragmentHandle} not found`);
+            //         goPath("/user/home");
+            //     }
+            //     return false;
+            // }
         } else {
             console.log("4> Init failed (Unknown Fragment Need)");
             goPath("/user/home");

@@ -1,15 +1,7 @@
 'use client';
 
-import {AsymmFullJsonKeypair, AsymmFullKeyPair, AsymmPrivKeyPair, AsymmPubKeyPair} from "@/libs/crypto-types";
-import {
-    asymmVerifyStr, checkPublicSplitKey, parseFullKeypair,
-    parsePrivateSplitKey,
-    parsePublicSplitKey,
-    secretSymmKeyFromFullKey,
-    symmDecryptObj
-} from "@/libs/crypto";
-import {IdentityStorageEntryDto, ServiceEntryDto} from "@/libs/dtos";
-import {getAuth, getFixedAuth} from "@/libs/req";
+import {AsymmFullKeyPair, AsymmPrivKeyPair, AsymmPubKeyPair} from "@/libs/crypto-types";
+import {parsePrivateSplitKey, parsePublicSplitKey} from "@/libs/crypto";
 import {basePath} from "@/libs/go-path";
 
 // This will be responsible for storing the keypair and loading it (either from SessionStorage or LocalStorage) and maybe secured with a password
@@ -191,36 +183,4 @@ async function _storeKeypair(keypair: AsymmFullKeyPair | null, mode: StorageMode
 
     await _setStore("Login-PubKey", keypair.pub.serialize(), mode);
     await _setStore("Login-PrivKey", keypair.priv.serialize(), mode);
-}
-
-export async function getAllUserIdentities(): Promise<IdentityStorageEntryDto[]> {
-    return await getAuth("/api/identity-storage");
-}
-
-export async function getIdentityKeypair(identityHandle: string): Promise<AsymmFullKeyPair> {
-    const entryDto: IdentityStorageEntryDto = await getAuth("/api/identity-storage/" + encodeURIComponent(identityHandle));
-
-    // Check Signature
-    const sigCheck = await asymmVerifyStr(entryDto.encKeypairEntry, entryDto.encKeypairEntrySignature, parsePublicSplitKey(entryDto.pubSplitKey));
-    if (!sigCheck)
-        throw new Error("Signature check failed for identity " + identityHandle);
-
-    // Decrypt
-    const myPrivSecret = await secretSymmKeyFromFullKey(await getKeypair());
-    const decKeypair = await symmDecryptObj<AsymmFullJsonKeypair>(entryDto.encKeypairEntry, myPrivSecret);
-    const keypair = parseFullKeypair(decKeypair);
-
-    const checkValid = await checkPublicSplitKey(keypair.pub);
-    if (!checkValid)
-        throw new Error("Decrypted keypair is invalid for identity " + identityHandle);
-
-    return keypair;
-}
-
-export async function getServiceEntries(identityKeypair: AsymmFullKeyPair): Promise<ServiceEntryDto[]> {
-    return await getFixedAuth("/api/service-entry", identityKeypair);
-}
-
-export async function getServiceEntry(identityKeypair: AsymmFullKeyPair, uuid: string): Promise<ServiceEntryDto> {
-    return await getFixedAuth("/api/service-entry/" + encodeURIComponent(uuid), identityKeypair);
 }

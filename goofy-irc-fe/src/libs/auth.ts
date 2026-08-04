@@ -13,7 +13,7 @@ export async function isLoggedIn(): Promise<boolean> {
 }
 
 export async function getMyHandle(): Promise<string | null> {
-    if (!hasKeypair())
+    if (!(await hasKeypair()))
         return null;
 
     const keypair = await getKeypair();
