@@ -13,6 +13,7 @@ import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -48,7 +49,7 @@ public class MainWsHandler extends TextWebSocketHandler {
 
         wsService.addEntry(auth.getHandle(), session);
         log.debug("[Open] Remaining Sessions total: {}, user: {}", wsService.getEntryCount(), wsService.getEntryCount(auth.getHandle()));
-
+        wsService.handleOnlineStatusChange(auth);
     }
 
     @Override
@@ -62,6 +63,11 @@ public class MainWsHandler extends TextWebSocketHandler {
         log.debug("WebSocket connection closed for user {} with status {}", auth.getHandle(), status);
         wsService.removeEntry(auth.getHandle(), session);
         log.debug("[Close] Remaining Sessions total: {}, user: {}", wsService.getEntryCount(), wsService.getEntryCount(auth.getHandle()));
+        try {
+            wsService.handleOnlineStatusChange(auth);
+        } catch (CannotCreateTransactionException e) {
+            // Ignore
+        }
     }
 
     // TODO: Handle / Keep track of which rooms users have open and only send room updates when they have the room open

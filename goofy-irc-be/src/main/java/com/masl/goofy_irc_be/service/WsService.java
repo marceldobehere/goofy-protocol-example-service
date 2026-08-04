@@ -132,7 +132,6 @@ public class WsService {
     public void trySendMessage(String handle, String rawMessage) {
         Map<WebSocketSession, MemberStatus> sessions = currentHandles.get(handle);
         if (sessions == null || sessions.isEmpty()) {
-            log.warn("Attempting to send message to handle without session");
             return;
         }
 
@@ -171,7 +170,7 @@ public class WsService {
     // TODO: Rate Limit
     @Transactional
     public void handleUpdateTypingEvent(GoofyAuthUser auth, WebSocketSession session, WsUpdateTyping ev) {
-        log.info("Handling Update Typing Event from {}: {}", auth.getHandle(), ev);
+        log.debug("Handling Update Typing Event from {}: {}", auth.getHandle(), ev);
 
         // Update Status
         MemberStatus status = getStatus(auth.getHandle(), session);
@@ -201,6 +200,13 @@ public class WsService {
             if (room != null)
                 trySendMessages(new WsUpdateRoomData(room.getName()), room);
         }
+    }
+
+    @Transactional
+    public void handleOnlineStatusChange(GoofyAuthUser auth) {
+        List<ChatRoom> rooms = chatRoomRepository.findAllByCreatedBy_Handle_OrMembersContaining(auth.getHandle(), auth.getHandle());
+        for (var room : rooms)
+            trySendMessages(new WsUpdateRoomData(room.getName()), room);
     }
 
     // Helper Stuff
