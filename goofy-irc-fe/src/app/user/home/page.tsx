@@ -61,7 +61,6 @@ export default function Page() {
         if (genEv.evType == "ERROR") {
             console.error(`WS GOT ERR [${serverName}]:`, genEv);
         } else if (genEv.evType == "UPDATE_ROOM_LIST") {
-            console.log(`WS GOT UPDATE ROOM`);
             await loadRoomListData();
         } else if (genEv.evType == "UPDATE_ROOM_DATA") {
             const roomName = (genEv as WsUpdateRoomData).roomName;
@@ -152,7 +151,6 @@ export default function Page() {
     }
 
     async function loadRoomListData(servers: LocalServerData[] = serverList) {
-        console.log("UPDATE ROOM LIST", servers);
         if (servers.length == 0)
             return;
 
