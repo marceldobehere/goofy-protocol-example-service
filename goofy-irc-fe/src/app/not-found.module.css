@@ -1,4 +1,4 @@
-.MainCont {
+.PageContainer {
   padding: 1rem;
   width: fit-content;
   margin: auto;
@@ -8,7 +8,7 @@
   margin: 1rem 0;
 }
 
-.MainButtons {
+.PageButtons {
   display: flex;
   flex-direction: row;
   justify-content: center;

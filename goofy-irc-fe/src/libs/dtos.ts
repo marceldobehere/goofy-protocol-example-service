@@ -1,5 +1,7 @@
 'use client';
 
+import {WsServerManager} from "@/libs/ws";
+
 export interface IrcExceptionDto {
     errorCode: number;
     message: string;
@@ -108,4 +110,125 @@ export interface ExportIdentityKeypair {
     pub: string;
     priv: string;
     handleFull: string;
+}
+
+export interface MemberStatusDto {
+    isOnline?: boolean | null;
+    typingInRoom?: string | null;
+}
+
+export interface ChatRoomDto {
+    name: string; // pattern: ^[a-z0-9_]+$
+    description: string; // size max: FieldSize.NORMAL_TEXT_LEN
+    userLimit?: number | null;
+    allowGuests: boolean;
+    allowJoining: boolean;
+    roomPasswordHash?: string | null;
+    needsPassword?: boolean;
+    memberCount?: number | null;
+    members?: string[] | null;
+    memberStatus?: MemberStatusDto[] | null;
+    bannedUsers?: string[] | null;
+    createdByHandle?: string | null;
+    createdAt?: string | null; // ISO timestamp string (maps from Instant)
+}
+
+
+
+export class WsGenericEv {
+    evType: WsGenericEvEventType;
+
+    constructor(evType: WsGenericEvEventType) {
+        this.evType = evType;
+    }
+}
+
+export type WsGenericEvEventType =
+    | "SEND_MSG"
+    | "RECEIVE_MSG"
+    | "UPDATE_TYPING"
+    | "UPDATE_ROOM_LIST"
+    | "UPDATE_ROOM_DATA"
+    | "ERROR";
+
+export class WsError extends WsGenericEv {
+    errorMsg: string;
+
+    constructor(errorMsg: string) {
+        super("ERROR");
+        this.errorMsg = errorMsg;
+    }
+}
+
+export class WsReceiveMsg extends WsGenericEv {
+    roomName: string;
+    senderHandle: string;
+    msgObj: string;
+
+    constructor(roomName: string, senderHandle: string, msgObj: string) {
+        super("RECEIVE_MSG");
+        this.roomName = roomName;
+        this.senderHandle = senderHandle;
+        this.msgObj = msgObj;
+    }
+}
+
+export class WsSendMsg extends WsGenericEv {
+    roomName: string;
+    msgObj: string;
+
+    constructor(roomName: string, msgObj: string) {
+        super("SEND_MSG");
+        this.roomName = roomName;
+        this.msgObj = msgObj;
+    }
+}
+
+export interface ChatMessageDto {
+    msg: string;
+}
+
+export class WsUpdateRoomData extends WsGenericEv {
+    roomName: string;
+
+    constructor(roomName: string) {
+        super("UPDATE_ROOM_DATA");
+        this.roomName = roomName;
+    }
+}
+
+export class WsUpdateRoomList extends WsGenericEv {
+    constructor() {
+        super("UPDATE_ROOM_LIST");
+    }
+}
+
+export class WsUpdateTyping extends WsGenericEv {
+    roomName: string | null;
+
+    constructor(roomName: string | null) {
+        super("UPDATE_TYPING");
+        this.roomName = roomName;
+    }
+}
+
+export interface LocalServerData {
+    serverUrl: string;
+    serverName: string;
+    ws: WsServerManager;
+}
+
+export interface LocalRoomData {
+    room: ChatRoomDto;
+    server: LocalServerData;
+    sameRoomNameInDiffServer: boolean;
+}
+
+
+
+export interface LocalChatMessage {
+    msgObj: ChatMessageDto;
+    handle: string;
+    timestamp: Date;
+    uuid: string;
 }
