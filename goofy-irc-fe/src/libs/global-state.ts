@@ -7,6 +7,7 @@ import {MyUserInfoDto, ServiceEntryDto} from "@/libs/dtos";
 import {goPath} from "@/libs/go-path";
 import {getIdentityKeypair, getServiceEntry} from "@/libs/auth-store";
 import {AsymmFullKeyPair} from "@/libs/crypto-types";
+import {clearWsHandlers} from "@/libs/ws";
 
 
 // TODO: Add Object that has the handleDomain, which will be retrieved by asking the service
@@ -126,6 +127,9 @@ async function initGlobalState(pathName: string, needLogin: boolean, needAdmin: 
     GlobalState.identityKeypair = null;
     GlobalState.identityHandle = null;
     GlobalState.serviceEntry = null;
+
+    // Clear Handlers
+    await clearWsHandlers();
 
     // User Check
     if (needLogin && !GlobalState.loggedIn) {

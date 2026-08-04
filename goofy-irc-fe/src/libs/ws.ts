@@ -26,6 +26,12 @@ export async function createSignedRequestParams(keypair: AsymmFullKeyPair): Prom
     return reqHeaders.entries().map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).toArray().join("&");
 }
 
+
+export async function clearWsHandlers() {
+    console.debug(`[WS INIT] Clearing current handlers (${_msgHandlers.length})`);
+    _msgHandlers = [];
+}
+
 // Only call after Global State is initialized
 export async function initWs(clearHandlers: boolean = true) {
     if (typeof window == "undefined")

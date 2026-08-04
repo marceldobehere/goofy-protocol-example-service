@@ -4,6 +4,7 @@ import styles from "./page.module.css";
 import Link from "next/link";
 
 export default function Page() {
+    // TODO: Add some kind of guest mode for non-registered users to just use by authenticating
     return (
         <main>
             <div className={styles.MainCont}>
