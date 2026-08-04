@@ -6,6 +6,7 @@ import com.masl.goofy_irc_be.dto.ws.WsGenericEv;
 import com.masl.goofy_irc_be.dto.ws.WsSendMsg;
 import com.masl.goofy_irc_be.dto.ws.WsUpdateTyping;
 import com.masl.goofy_irc_be.service.WsService;
+import jakarta.transaction.Transactional;
 import jakarta.validation.ValidationException;
 import jakarta.validation.Validator;
 import org.jspecify.annotations.NonNull;
@@ -65,6 +66,7 @@ public class MainWsHandler extends TextWebSocketHandler {
 
     // TODO: Handle / Keep track of which rooms users have open and only send room updates when they have the room open
 
+    @Transactional
     @Override
     protected void handleTextMessage(WebSocketSession session, @NonNull TextMessage message) throws Exception {
         GoofyAuthUser auth = (GoofyAuthUser) session.getAttributes().get("authUser");

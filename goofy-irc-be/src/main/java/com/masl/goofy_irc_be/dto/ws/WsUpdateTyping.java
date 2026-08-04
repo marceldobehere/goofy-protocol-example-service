@@ -1,6 +1,5 @@
 package com.masl.goofy_irc_be.dto.ws;
 
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -11,6 +10,5 @@ public class WsUpdateTyping extends WsGenericEv {
         super(EventType.UPDATE_TYPING);
     }
 
-    @NotNull
-    private Boolean isTyping;
+    private String roomName;
 }

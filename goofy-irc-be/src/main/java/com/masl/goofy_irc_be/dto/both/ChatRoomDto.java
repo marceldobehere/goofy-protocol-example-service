@@ -48,6 +48,6 @@ public class ChatRoomDto {
     @AllArgsConstructor
     public static class MemberStatusDto {
         private Boolean isOnline;
-        private Boolean isTyping;
+        private String typingInRoom;
     }
 }

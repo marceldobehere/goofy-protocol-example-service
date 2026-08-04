@@ -7,6 +7,7 @@ import com.masl.goofy_irc_be.entity.FieldSize;
 import com.masl.goofy_irc_be.exception.client.room.RoomActionNotAllowed;
 import com.masl.goofy_irc_be.exception.client.room.RoomNotFound;
 import com.masl.goofy_irc_be.repository.ChatRoomRepository;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.slf4j.Logger;
@@ -49,7 +50,7 @@ public class WsService {
 
     synchronized public void addEntry(String handle, WebSocketSession session) {
         Map<WebSocketSession, MemberStatus> sessions = currentHandles.computeIfAbsent(handle, (_) -> new ConcurrentHashMap<>());
-        sessions.put(session, new MemberStatus(true, false));
+        sessions.put(session, new MemberStatus(true, null));
         sessionWrap.put(session, new ConcurrentWebSocketSessionDecorator(session, WS_SEND_TIMEOUT, WS_BUFF_SIZE_LIMIT));
     }
 
@@ -76,18 +77,18 @@ public class WsService {
         sessions.put(session, newStatus);
     }
 
-    synchronized public MemberStatus getStatus(String handle) {
+    synchronized public MemberStatus getStatus(String handle, String fromRoom) {
         Map<WebSocketSession, MemberStatus> sessions = currentHandles.get(handle);
         if (sessions == null)
-            return new MemberStatus(false, false);
+            return new MemberStatus(false, null);
 
-        return combineStatusList(sessions.values().stream().toList());
+        return combineStatusList(sessions.values().stream().toList(), fromRoom);
     }
 
     synchronized public MemberStatus getStatus(String handle, WebSocketSession session) {
         Map<WebSocketSession, MemberStatus> sessions = currentHandles.get(handle);
         if (sessions == null)
-            return new MemberStatus(false, false);
+            return new MemberStatus(false, null);
 
         return sessions.get(session);
     }
@@ -107,7 +108,7 @@ public class WsService {
         trySendMessage(handle, mapper.writeValueAsString(ev));
     }
 
-    public void trySendMessage(WsGenericEv ev, ChatRoom room) {
+    public void trySendMessages(WsGenericEv ev, ChatRoom room) {
         trySendMessages(ev, room.getMembers(), room.getCreatedBy().getHandle());
     }
 
@@ -147,6 +148,7 @@ public class WsService {
     }
 
     // TODO: Rate Limit
+    @Transactional
     public void handleSendMessageEvent(GoofyAuthUser auth, WsSendMsg ev) throws RoomNotFound, RoomActionNotAllowed {
         log.debug("Handling Send Message Event from {}: {}", auth.getHandle(), ev);
 
@@ -163,30 +165,42 @@ public class WsService {
         msg.setSenderHandle(auth.getHandle());
         msg.setRoomName(room.getName());
         msg.setMsgObj(ev.getMsgObj());
-        trySendMessage(msg, room);
+        trySendMessages(msg, room);
     }
 
     // TODO: Rate Limit
+    @Transactional
     public void handleUpdateTypingEvent(GoofyAuthUser auth, WebSocketSession session, WsUpdateTyping ev) {
-        // log.debug("Handling Update Typing Event from {}: {}", auth.getHandle(), ev);
+        log.info("Handling Update Typing Event from {}: {}", auth.getHandle(), ev);
 
         // Update Status
         MemberStatus status = getStatus(auth.getHandle(), session);
         if (status == null)
             return;
-        status.isTyping = ev.getIsTyping();
+
+        String oldRoom = status.typingInRoom;
+        status.typingInRoom = ev.getRoomName();
         setStatus(auth.getHandle(), session, status);
 
-        // Send to every member of every room the user is in
-        List<ChatRoom> rooms = chatRoomRepository.findAllByCreatedBy_Handle_OrMembersContaining(auth.getHandle(), auth.getHandle());
-        Set<String> updateHandles = new HashSet<>();
-        for (var cRoom : rooms) {
-            updateHandles.add(cRoom.getCreatedBy().getHandle());
-            updateHandles.addAll(cRoom.getMembers());
-        }
+        // Early out
+        if (Objects.equals(oldRoom, status.typingInRoom))
+            return;
 
         // TODO: Don't send full update room and rather a specified update state message, to not DoS my server every update xd
-        trySendMessages(new WsUpdateRoomList(), updateHandles);
+
+        // Tell ppl from old room to update
+        if (oldRoom != null) {
+            ChatRoom room = chatRoomRepository.findByName(oldRoom);
+            if (room != null)
+                trySendMessages(new WsUpdateRoomData(room.getName()), room);
+        }
+
+        // Tell ppl in new room to update
+        if (status.typingInRoom != null) {
+            ChatRoom room = chatRoomRepository.findByName(status.typingInRoom);
+            if (room != null)
+                trySendMessages(new WsUpdateRoomData(room.getName()), room);
+        }
     }
 
     // Helper Stuff
@@ -194,16 +208,17 @@ public class WsService {
     @AllArgsConstructor
     public static class MemberStatus {
         public boolean isOnline;
-        public boolean isTyping;
+        public String typingInRoom;
     }
 
-    private MemberStatus combineStatusList(List<MemberStatus> statusList) {
+    private MemberStatus combineStatusList(List<MemberStatus> statusList, String room) {
         boolean anyoneOnline = false; // should technically always be true but oh well
-        boolean anyoneTyping = false;
+        String typingInRoom = null;
         for (var status : statusList) {
             anyoneOnline |= status.isOnline;
-            anyoneTyping |= status.isTyping;
+            if (Objects.equals(room, status.typingInRoom))
+                typingInRoom = room;
         }
-        return new MemberStatus(anyoneOnline, anyoneTyping);
+        return new MemberStatus(anyoneOnline, typingInRoom);
     }
 }

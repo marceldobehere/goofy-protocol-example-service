@@ -223,6 +223,8 @@ public class ChatRoomEndpoint {
         room.getMembers().add(auth.getHandle());
         chatRoomRepository.save(room);
 
+        // TODO: Send System message that person joined
+
         // Send Room Update
         wsService.sendRoomUpdate(room.getName(), room.getMembers(), room.getCreatedBy().getHandle());
     }
@@ -248,6 +250,8 @@ public class ChatRoomEndpoint {
         // Leave and Save
         room.getMembers().remove(auth.getHandle());
         chatRoomRepository.save(room);
+
+        // TODO: Send System message that person left
 
         // Send Room Update
         wsService.sendRoomUpdate(room.getName(), room.getMembers(), room.getCreatedBy().getHandle(), auth.getHandle());
@@ -275,6 +279,8 @@ public class ChatRoomEndpoint {
         // Kick and Save
         room.getMembers().remove(username);
         chatRoomRepository.save(room);
+
+        // TODO: Send System message that person left
 
         // Send Room Update
         wsService.sendRoomUpdate(room.getName(), room.getMembers(), room.getCreatedBy().getHandle(), username);
@@ -308,6 +314,8 @@ public class ChatRoomEndpoint {
 
         room.getBannedUsers().add(username);
         chatRoomRepository.save(room);
+
+        // TODO: Send System message IF person left
 
         // Send Room Update
         wsService.sendRoomUpdate(room.getName(), room.getMembers(), room.getCreatedBy().getHandle(), username);
@@ -359,8 +367,8 @@ public class ChatRoomEndpoint {
         // Get Member Stats
         List<ChatRoomDto.MemberStatusDto> memberStatus = new ArrayList<>();
         for (String member : members) {
-            WsService.MemberStatus status = wsService.getStatus(member);
-            memberStatus.add(new ChatRoomDto.MemberStatusDto(status.isOnline, status.isTyping));
+            WsService.MemberStatus status = wsService.getStatus(member, room.getName());
+            memberStatus.add(new ChatRoomDto.MemberStatusDto(status.isOnline, status.typingInRoom));
         }
 
         // Create DTO
