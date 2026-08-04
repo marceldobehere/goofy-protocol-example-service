@@ -326,14 +326,14 @@ export default function Page() {
         const canJoin = canJoinRoom(room);
         const extra = isMember ? <button onClick={() => {setAndLoadCurrentRoom(room).then()}}>View</button> : ( canJoin ? <button onClick={() => {joinRoom(room).then()}}>Join</button> : <></>);
 
-        return (<li key={key}>{text} {extra}</li>);
+        return (<li key={key} title={JSON.stringify(room.room, null, 4)}>{text} {extra}</li>);
     }
 
     function renderRoomDetails() {
         if (currRoom == null)
             return <></>;
 
-        const onlineCount = currRoom.room.members!.filter((_, idx) => currRoom.room.memberStatus![idx].isOnline)?.length;
+        const onlineCount = currRoom.room.members == null ? 0 : currRoom.room.members!.filter((_, idx) => currRoom.room.memberStatus![idx].isOnline)?.length;
 
         return <div>
             <p>{currRoom.room.description}</p>
