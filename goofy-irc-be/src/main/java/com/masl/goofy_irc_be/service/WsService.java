@@ -164,6 +164,7 @@ public class WsService {
         msg.setSenderHandle(auth.getHandle());
         msg.setRoomName(room.getName());
         msg.setMsgObj(ev.getMsgObj());
+        msg.setSig(ev.getSig());
         trySendMessages(msg, room);
     }
 

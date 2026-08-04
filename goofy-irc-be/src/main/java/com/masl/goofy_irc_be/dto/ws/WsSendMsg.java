@@ -21,4 +21,8 @@ public class WsSendMsg extends WsGenericEv {
     @NotNull
     @Size(max = FieldSize.LONG_TEXT_LEN + FieldSize.SIGNATURE_LEN)
     private String msgObj;
+
+    @NotNull
+    @Size(max = FieldSize.SIGNATURE_LEN)
+    private String sig;
 }
