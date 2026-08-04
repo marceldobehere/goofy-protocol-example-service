@@ -63,6 +63,8 @@ public class MainWsHandler extends TextWebSocketHandler {
         log.debug("[Close] Remaining Sessions total: {}, user: {}", wsService.getEntryCount(), wsService.getEntryCount(auth.getHandle()));
     }
 
+    // TODO: Handle / Keep track of which rooms users have open and only send room updates when they have the room open
+
     @Override
     protected void handleTextMessage(WebSocketSession session, @NonNull TextMessage message) throws Exception {
         GoofyAuthUser auth = (GoofyAuthUser) session.getAttributes().get("authUser");
@@ -71,6 +73,8 @@ public class MainWsHandler extends TextWebSocketHandler {
             session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Authentication required"));
             return;
         }
+
+        // TODO: Basic Rate Limiting
 
         String payload = message.getPayload();
         // log.info("Received message from {}: {}", auth.getHandle(), payload);

@@ -12,4 +12,5 @@ public class FieldSize {
     public static final int SHORT_TEXT_LEN = 300;
     public static final int NORMAL_TEXT_LEN = 1000;
     public static final int LONG_TEXT_LEN = 10_000;
+    public static final int MSG_DATA_LEN = 100_000;
 }

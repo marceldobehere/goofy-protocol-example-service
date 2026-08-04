@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.net.URI;
 
+// TODO: Add sensible default values or error early
 @ConfigurationProperties(prefix = "goofy.general")
 @Data
 public class GeneralProperties {

@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.util.List;
 import java.util.regex.Pattern;
 
+// TODO: Add sensible default values or error early
 @ConfigurationProperties(prefix = "goofy.register")
 @Data
 public class RegisterProperties {

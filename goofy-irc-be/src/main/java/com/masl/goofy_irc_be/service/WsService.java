@@ -3,6 +3,7 @@ package com.masl.goofy_irc_be.service;
 import com.masl.goofy_irc_be.auth.GoofyAuthUser;
 import com.masl.goofy_irc_be.dto.ws.*;
 import com.masl.goofy_irc_be.entity.ChatRoom;
+import com.masl.goofy_irc_be.entity.FieldSize;
 import com.masl.goofy_irc_be.exception.client.room.RoomActionNotAllowed;
 import com.masl.goofy_irc_be.exception.client.room.RoomNotFound;
 import com.masl.goofy_irc_be.repository.ChatRoomRepository;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
@@ -23,13 +25,16 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class WsService {
     private static final Logger log = LoggerFactory.getLogger(WsService.class);
+    private static final int WS_SEND_TIMEOUT = 10_000;
+    private static final int WS_BUFF_SIZE_LIMIT = FieldSize.MSG_DATA_LEN;
 
-
+    private final Map<WebSocketSession, ConcurrentWebSocketSessionDecorator> sessionWrap;
     private final Map<String, Map<WebSocketSession, MemberStatus>> currentHandles;
     private final ChatRoomRepository chatRoomRepository;
 
     public WsService(ChatRoomRepository chatRoomRepository) {
         this.chatRoomRepository = chatRoomRepository;
+        sessionWrap = new ConcurrentHashMap<>();
         currentHandles = new ConcurrentHashMap<>();
     }
 
@@ -45,6 +50,7 @@ public class WsService {
     synchronized public void addEntry(String handle, WebSocketSession session) {
         Map<WebSocketSession, MemberStatus> sessions = currentHandles.computeIfAbsent(handle, (_) -> new ConcurrentHashMap<>());
         sessions.put(session, new MemberStatus(true, false));
+        sessionWrap.put(session, new ConcurrentWebSocketSessionDecorator(session, WS_SEND_TIMEOUT, WS_BUFF_SIZE_LIMIT));
     }
 
     synchronized public void removeEntry(String handle, WebSocketSession session) {
@@ -57,6 +63,7 @@ public class WsService {
         sessions.remove(session);
         if (sessions.isEmpty())
             currentHandles.remove(handle);
+        sessionWrap.remove(session);
     }
 
     synchronized public void setStatus(String handle, WebSocketSession session, MemberStatus newStatus) {
@@ -111,12 +118,13 @@ public class WsService {
         handles.forEach((handle) -> trySendMessage(handle, ev));
     }
 
-    public void trySendError(WebSocketSession session, WsError err) {
+    public void trySendError(WebSocketSession _session, WsError err) {
         try {
             ObjectMapper mapper = new ObjectMapper();
+            var session = sessionWrap.get(_session);
             session.sendMessage(new TextMessage(mapper.writeValueAsString(err)));
         } catch (IOException e) {
-            log.warn("Sending Message to specific session {} failed: {}", session.getId(), e.getMessage());
+            log.warn("Sending Message to specific session {} failed: {}", _session.getId(), e.getMessage());
         }
     }
 
@@ -127,15 +135,18 @@ public class WsService {
             return;
         }
 
-        sessions.keySet().forEach((session) -> {
+        // TODO: Potentially parallelize?
+        sessions.keySet().forEach((_session) -> {
             try {
+                var session = sessionWrap.get(_session);
                 session.sendMessage(new TextMessage(rawMessage));
             } catch (IOException e) {
-                log.warn("Sending Message to session {} failed: {}", session.getId(), e.getMessage());
+                log.warn("Sending Message to session {} failed: {}", _session.getId(), e.getMessage());
             }
         });
     }
 
+    // TODO: Rate Limit
     public void handleSendMessageEvent(GoofyAuthUser auth, WsSendMsg ev) throws RoomNotFound, RoomActionNotAllowed {
         log.debug("Handling Send Message Event from {}: {}", auth.getHandle(), ev);
 
@@ -155,6 +166,7 @@ public class WsService {
         trySendMessage(msg, room);
     }
 
+    // TODO: Rate Limit
     public void handleUpdateTypingEvent(GoofyAuthUser auth, WebSocketSession session, WsUpdateTyping ev) {
         // log.debug("Handling Update Typing Event from {}: {}", auth.getHandle(), ev);
 

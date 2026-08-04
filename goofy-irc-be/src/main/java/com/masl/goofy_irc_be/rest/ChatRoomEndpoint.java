@@ -62,6 +62,7 @@ public class ChatRoomEndpoint {
 
     // TODO: Get Room Creation Limit
 
+    // TODO: Rate Limit
     // Create Chat Room
     @PostMapping("/create")
     @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
@@ -138,6 +139,7 @@ public class ChatRoomEndpoint {
         return fromChatRoom(room, auth.getHandle(), auth.getAdmin());
     }
 
+    // TODO: Rate Limit
     // Update Chat Room details
     @PutMapping("/room/{roomName}")
     @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
@@ -157,6 +159,8 @@ public class ChatRoomEndpoint {
             if (updateDto.getUserLimit() < 2 || updateDto.getUserLimit() > roomProperties.getDefaultMaxUserLimit())
                 throw new RoomInvalid("userLimit invalid");
 
+        final boolean nameChanged = !room.getName().equals(updateDto.getName());
+
         // Create Entity
         room.setName(updateDto.getName());
         room.setDescription(updateDto.getDescription());
@@ -169,9 +173,13 @@ public class ChatRoomEndpoint {
         // Send Room Update
         wsService.sendRoomUpdate(room.getName(), room.getMembers(), auth.getHandle());
 
+        if (nameChanged)
+            wsService.sendRoomListUpdate();
+
         return fromChatRoom(room, auth.getHandle(), true);
     }
 
+    // TODO: Rate Limit
     // Join Chat Room
     @PostMapping("/room/{roomName}/join")
     @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
@@ -245,6 +253,7 @@ public class ChatRoomEndpoint {
         wsService.sendRoomUpdate(room.getName(), room.getMembers(), room.getCreatedBy().getHandle(), auth.getHandle());
     }
 
+    // TODO: Rate Limit
     // Kick Member from Room (cant kick yourself)
     @PostMapping("/room/{roomName}/user/{username}/kick")
     @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
@@ -271,6 +280,7 @@ public class ChatRoomEndpoint {
         wsService.sendRoomUpdate(room.getName(), room.getMembers(), room.getCreatedBy().getHandle(), username);
     }
 
+    // TODO: Rate Limit
     // Ban Member from Room (cant ban yourself)
     @PostMapping("/room/{roomName}/user/{username}/ban")
     @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")

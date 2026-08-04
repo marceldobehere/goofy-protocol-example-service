@@ -29,7 +29,7 @@ public class RegistrationEndpoint {
         this.registrationService = registrationService;
     }
 
-    // TODO: Rate Limit?
+    // TODO: Rate Limit
     @PostMapping
     @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
     @IrcEndpoint(summary = "Attempt Registration", description = "To register, a registration code is required (It can be left blank IF the handle comes from a domain, which is in the `autoAllowDomains` list). The request needs to be signed with the keypair that wants to register.")
@@ -63,7 +63,7 @@ public class RegistrationEndpoint {
         return registrationService.isCodeValid(code);
     }
 
-    // TODO: Rate Limit & Maybe Remove OUTSIDE_ENTITY Role?
+    // TODO: Rate Limit
     @PostMapping("/request")
     @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
     @IrcEndpoint(summary = "Request a Registration Code.", description = "You will either be manually contacted by a person or an automated system might send you an email/etc.")
