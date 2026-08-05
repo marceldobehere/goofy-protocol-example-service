@@ -11,7 +11,8 @@ export default function Page() {
                 <h2 className={styles.Title}>Goofy IRC</h2>
 
                 <p className={styles.Introduction}>
-                    An example IRC Service for the Goofy Protocol.
+                    An example IRC Service for the Goofy Protocol.<br/><br/>
+                    For more information, visit <a href={"https://github.com/marceldobehere/goofy-protocol-example-service"} target={"_blank"}>this page</a>!
                 </p>
 
                 <div className={styles.MainButtons}>
