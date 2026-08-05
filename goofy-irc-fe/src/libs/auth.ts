@@ -1,7 +1,7 @@
 'use client';
 
-import {ExportIdentityKeypair, IrcHandleLookupDto, MyUserInfoDto} from "@/libs/dtos";
-import {getAuth, getNoAuth} from "@/libs/req";
+import {ExportIdentityKeypair, GeneralInfoDto, IrcHandleLookupDto, MyUserInfoDto} from "@/libs/dtos";
+import {getAuth, getNoAuth, putAuth} from "@/libs/req";
 import {getBaseServerUrl, getKeypair, hasKeypair, saveKeypair} from "@/libs/auth-store";
 import {deriveHandleFromPublicSplitKey, parseFullKeypair} from "@/libs/crypto";
 import {goPath} from "@/libs/go-path";
@@ -63,6 +63,13 @@ export async function getUserInfo(throwError: boolean = false): Promise<MyUserIn
     }
 }
 
+export async function setUserInfo(updateDto: MyUserInfoDto) {
+    if (!(await isLoggedIn()))
+        return;
+
+    await putAuth("/api/user/info", updateDto);
+}
+
 export async function logout(): Promise<void> {
     await saveKeypair(null);
     goPath("/guest/login");
@@ -93,6 +100,13 @@ export async function parseIdentityKeypair(kp: ExportIdentityKeypair): Promise<I
     }
 }
 
+export async function getServerDetails(serverUrl: string | null = null): Promise<GeneralInfoDto> {
+    if (serverUrl == null)
+        serverUrl = await getBaseServerUrl();
+
+    return await getNoAuth(`${serverUrl}/api/general/info`);
+}
+
 // TODO: Store in session storage for x amt of time
 const lookUpMap = new Map<string, IrcHandleLookupDto>();
 export async function lookUpHandle(handle: string, serverUrl: string | null = null): Promise<IrcHandleLookupDto> {
@@ -104,6 +118,7 @@ export async function lookUpHandle(handle: string, serverUrl: string | null = nu
         return entry;
 
     const lookup: IrcHandleLookupDto = await getNoAuth(`${serverUrl}/api/user/lookup/${handle}`);
+    // TODO: Verify
     lookUpMap.set(handle, lookup);
     return lookup;
 }
@@ -111,5 +126,7 @@ export async function lookUpHandle(handle: string, serverUrl: string | null = nu
 const SUPPORTED_FIS_PROTOCOLS = ["https://", "http://"];
 export async function getFisUrlsFromHandle(handle: string): Promise<string[]> {
     const lookupRes = await lookUpHandle(handle);
+    if (handle.includes(":80"))
+        return SUPPORTED_FIS_PROTOCOLS.toReversed().map(protocol => `${protocol}${lookupRes.handleDomain}`);
     return SUPPORTED_FIS_PROTOCOLS.map(protocol => `${protocol}${lookupRes.handleDomain}`);
 }

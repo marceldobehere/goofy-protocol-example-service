@@ -178,3 +178,27 @@ export async function putAuth<T>(path: string, body: object | string ) {
 export async function putFixedAuth<T>(path: string, body: object | string , keypair: IdentityAsymmFullKeyPair) {
     return await doRequestSpinner<T>(path, "PUT", body, keypair) as T;
 }
+
+export async function getFixedLockAuth<T>(path: string, keypair: IdentityAsymmFullKeyPair, lockToken: string | null): Promise<T> {
+    const extraHeaders: Map<string, string> = new Map();
+    if (lockToken != null)
+        extraHeaders.set("X-Lock-Token", lockToken);
+    return await doRequestSpinner<T>(path, "GET", null, keypair, extraHeaders) as T;
+}
+export async function postFixedLockAuth<T>(path: string, body: object | string , keypair: IdentityAsymmFullKeyPair, lockToken: string | null, extraHeaders: Map<string, string> = new Map()) {
+    if (lockToken != null)
+        extraHeaders.set("X-Lock-Token", lockToken);
+    return await doRequestSpinner<T>(path, "POST", body, keypair, extraHeaders) as T;
+}
+export async function putFixedLockAuth<T>(path: string, body: object | string , keypair: IdentityAsymmFullKeyPair, lockToken: string | null) {
+    const extraHeaders: Map<string, string> = new Map();
+    if (lockToken != null)
+        extraHeaders.set("X-Lock-Token", lockToken);
+    return await doRequestSpinner<T>(path, "PUT", body, keypair, extraHeaders) as T;
+}
+export async function deleteFixedLockAuth<T>(path: string, keypair: IdentityAsymmFullKeyPair, lockToken: string | null): Promise<T> {
+    const extraHeaders: Map<string, string> = new Map();
+    if (lockToken != null)
+        extraHeaders.set("X-Lock-Token", lockToken);
+    return await doRequestSpinner<T>(path, "DELETE", null, keypair, extraHeaders) as T;
+}

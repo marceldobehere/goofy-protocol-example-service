@@ -127,6 +127,14 @@ export interface ServiceTableEntryDto {
     handlesWithWritePerms: string[];
 }
 
+export interface LocalTableStructure {
+    tableName: string;
+    schemaVersion?: number;
+    columns?: TableColumnDto[];
+    handlesWithReadPerms: string[];
+    handlesWithWritePerms: string[];
+}
+
 export interface ServiceTableQueryResultDto {
     colNames: string[];
     colTypes: ColType[];
@@ -172,5 +180,11 @@ export interface TableBasicQueryDto {
 
 export interface TableSelectDto {
     colNames: string[];
+    basicQuery?: TableBasicQueryDto;
+}
+
+export interface TableUpdateDto {
+    colNames: string[];
+    colValues: never[];
     basicQuery?: TableBasicQueryDto;
 }

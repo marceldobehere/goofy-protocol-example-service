@@ -1,7 +1,21 @@
 'use client';
 
-import {ServiceBucketEntryDto, ServiceEntryDto} from "@/libs/service-dtos";
-import {getFixedAuth, getFixedAuthBytes, postFixedAuth, putFixedAuth} from "@/libs/req";
+import {
+    ServiceBucketEntryDto,
+    ServiceEntryDto,
+    ServiceTableEntryDto, ServiceTableQueryResultDto,
+    TableBasicQueryDto, TableSelectDto,
+    TableUpdateDto
+} from "@/libs/service-dtos";
+import {
+    deleteFixedLockAuth,
+    getFixedAuth,
+    getFixedAuthBytes,
+    getFixedLockAuth,
+    postFixedAuth, postFixedLockAuth,
+    putFixedAuth,
+    putFixedLockAuth
+} from "@/libs/req";
 import {getFisUrlsFromHandle, IdentityAsymmFullKeyPair} from "@/libs/auth";
 import {readFileBytes, uploadData} from "@/libs/file-utils";
 import {deriveHandleFromPublicSplitKey, parseFullHandle} from "@/libs/crypto";
@@ -80,3 +94,71 @@ export async function fetchBucketEntry(identityKeypair: IdentityAsymmFullKeyPair
     // Cleanup
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+
+// Get All Tables
+export async function getAllTableEntries(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string): Promise<ServiceTableEntryDto[]> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return await fisReq(identityKeypair.handleFull, getFixedAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/entry`, identityKeypair);
+}
+
+// Fetch table using UUID
+export async function getTableEntry(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, tableUuid: string, lockToken: string | null = null): Promise<ServiceTableEntryDto> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return await fisReq(identityKeypair.handleFull, getFixedLockAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/entry/${tableUuid}`, identityKeypair, lockToken);
+}
+
+// Create Table
+export async function createTableEntry(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, tableDto: ServiceTableEntryDto): Promise<ServiceTableEntryDto> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return await fisReq(identityKeypair.handleFull, postFixedAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/entry`, tableDto, identityKeypair);
+}
+
+// Update Table (Schema + Access)
+export async function updateTableEntry(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, tableUuid: string, tableDto: ServiceTableEntryDto, lockToken: string | null = null): Promise<ServiceTableEntryDto> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return await fisReq(identityKeypair.handleFull, putFixedLockAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/entry/${tableUuid}`, tableDto, identityKeypair, lockToken);
+}
+
+// Lock Table
+export async function lockTableEntry(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, tableUuid: string, readLock: boolean, writeLock: boolean, lockToken: string | null = null): Promise<string> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return await fisReq(identityKeypair.handleFull, postFixedLockAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/lock/${tableUuid}?readLock=${readLock}&writeLock=${writeLock}`, "", identityKeypair, lockToken);
+}
+
+// Unlock Table
+export async function unlockTableEntry(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, tableUuid: string, readLock: boolean, writeLock: boolean, lockToken: string) {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    await fisReq(identityKeypair.handleFull, postFixedLockAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/unlock/${tableUuid}?readLock=${readLock}&writeLock=${writeLock}`, "", identityKeypair, lockToken);
+}
+
+// Query Table
+export async function queryTable(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, tableUuid: string, selectDto: TableSelectDto, lockToken: string | null = null): Promise<ServiceTableQueryResultDto> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return await fisReq(identityKeypair.handleFull, postFixedLockAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/entry/${tableUuid}/query`, selectDto, identityKeypair, lockToken);
+}
+
+// Insert Row into Table
+export async function insertIntoTable(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, tableUuid: string, row: object, lockToken: string | null = null) {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return await fisReq(identityKeypair.handleFull, postFixedLockAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/entry/${tableUuid}/rows`, row, identityKeypair, lockToken);
+}
+
+// Delete from Table
+export async function deleteFromTable(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, tableUuid: string, deleteQuery: TableBasicQueryDto, lockToken: string | null = null): Promise<number> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return await fisReq(identityKeypair.handleFull, deleteFixedLockAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/entry/${tableUuid}/rows`, deleteQuery, identityKeypair, lockToken);
+}
+
+// Update Row(s) in Table
+export async function updateTableRows(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, tableUuid: string, updateDto: TableUpdateDto, lockToken: string | null = null): Promise<number> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return await fisReq(identityKeypair.handleFull, putFixedLockAuth, `/fis-api/service-table/${identityHandle}/${serviceEntryUuid}/entry/${tableUuid}/rows`, updateDto, identityKeypair, lockToken);
+}
+
+export async function getTablePath(identityKeypair: IdentityAsymmFullKeyPair, serviceUuid: string, tableUuid: string): Promise<string> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
+    return `${identityHandle}@${serviceUuid}@${tableUuid}`;
+}
+
+// Helper Methods for Queries

@@ -123,21 +123,21 @@ export async function symmDecryptObj<T>(str: string, secret: SecretString): Prom
 
 // Handle Stuff
 
-// TODO: Cache
+// TODO: Store in session storage for x amt of time
+const deriveHandleMap = new Map<string, Handle>();
 export async function deriveHandleFromPublicSplitKey(pubSplitKey: AsymmPubKeyPair): Promise<Handle> {
-    return await handleCrypto.deriveHandle(pubSplitKey.serialize());
+    const key = pubSplitKey.serialize();
+    const entry = deriveHandleMap.get(key);
+    if (entry != null)
+        return entry;
+
+    const res = await handleCrypto.deriveHandle(key);
+    deriveHandleMap.set(key, res);
+    return res;
 }
 
 export async function verifyKeyAndHandle(pubSplitKey: AsymmPubKeyPair, handle: Handle): Promise<boolean> {
     return await handleCrypto.verifyKeyAndHandle(pubSplitKey.serialize(), handle);
-}
-
-// TODO: Implement external lookup
-export async function getPublicSplitKeyFromHandle(handle: Handle): Promise<AsymmPubKeyPair | null> {
-    const pubSplitKeyStr = await handleCrypto.getPublicSplitKeyFromHandle(handle) as string | null;
-    if (!pubSplitKeyStr)
-        return null;
-    return parsePublicSplitKey(pubSplitKeyStr);
 }
 
 export function parseFullHandle(handleWithOptDomain: string): FullHandle {

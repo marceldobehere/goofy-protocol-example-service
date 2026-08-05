@@ -97,7 +97,7 @@ export async function setBaseServerUrl(url: string) {
 }
 export async function getBaseServerUrl(): Promise<string> {
     await init();
-    return tempServerOverride || currServerBase;
+    return /*tempServerOverride ||*/ currServerBase;
 }
 
 export async function hasKeypair(): Promise<boolean> {

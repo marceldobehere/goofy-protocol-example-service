@@ -82,6 +82,8 @@ export interface MyUserInfoDto {
     pubKey: string;
     authRole: AuthRole;
     isRestricted: boolean;
+    friendRequestTablePath: string;
+    receivedDmsTablePath: string;
 }
 
 export interface RegistrationRequestDto {
