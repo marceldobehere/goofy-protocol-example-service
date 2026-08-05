@@ -20,7 +20,7 @@ import {
     WsUpdateTyping
 } from "@/libs/dtos";
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
-import {deleteAuth, getAuth, postAuth} from "@/libs/req";
+import {deleteAuth, getAuth, postAuth, putAuth} from "@/libs/req";
 import {asymmSignObj, asymmVerifyObj, parsePublicSplitKey, sha256ToText} from "@/libs/crypto";
 
 export default function Page() {
@@ -323,6 +323,20 @@ export default function Page() {
             return;
 
         // TODO: Implement
+        const updatedDto = prompt("Enter updated room DTO (JSON)", JSON.stringify(room.room, null, 4));
+        if (updatedDto == null || updatedDto.trim() == "")
+            return;
+
+        const updatedRoom: ChatRoomDto = JSON.parse(updatedDto);
+
+        try {
+            const res: ChatRoomDto = await putAuth(room.server.serverUrl + `/api/chatroom/room/${room.room.name}`, updatedRoom);
+            alert("Updated Room: " + JSON.stringify(res, null, 2));
+            await loadRoomListData();
+        } catch (err) {
+            console.error(err);
+            alert("Failed to update room: " + (err as Error).message);
+        }
     }
 
     async function addIrcServer() {
