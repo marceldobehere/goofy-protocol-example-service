@@ -13,6 +13,7 @@ import com.masl.goofy_irc_be.repository.CachedKeyHandleRepository;
 import com.masl.goofy_irc_be.repository.UserRepository;
 import com.masl.goofy_protocol_core.crypto.connected.GenericHandleCrypto;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -41,11 +42,20 @@ public class UserEndpoint {
     @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
     @IrcEndpoint(summary = "Gets Information for the current User", description = "This Endpoint returns information about the current user/identity, including their handle, public key, and authentication role.")
     public MyUserInfoDto myInfo(@AuthenticationPrincipal GoofyAuthUser auth) {
-        if (auth.getUser()) {
-            User user = userRepository.findByHandle(auth.getHandle());
-            return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER);
-        }
-        return new MyUserInfoDto(auth.getHandle(), "", "", ROLES.AuthRoleEnumDto.OUTSIDE_ENTITY);
+        User user = userRepository.findByHandle(auth.getHandle());
+        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath());
+    }
+
+    // Update My User Info
+    @PutMapping("/info")
+    @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
+    @IrcEndpoint(summary = "Updates Information for the current User", description = "You can update: `friendRequestTablePath` and `receivedDmsTablePath`. The format is `identityHandle@serviceUuid@tableUuid`")
+    public MyUserInfoDto updateMyInfo(@AuthenticationPrincipal GoofyAuthUser auth, @Valid @RequestBody MyUserInfoDto updateDto) {
+        User user = userRepository.findByHandle(auth.getHandle());
+        user.setFriendRequestTablePath(updateDto.getFriendRequestTablePath());
+        user.setReceivedDmsTablePath(updateDto.getReceivedDmsTablePath());
+        userRepository.save(user);
+        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath());
     }
 
     @DeleteMapping("/delete")

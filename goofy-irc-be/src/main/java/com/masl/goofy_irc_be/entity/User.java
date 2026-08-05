@@ -41,6 +41,12 @@ public class User {
     // after 15-30 days just wipe the data
     // -> avoid data loss
 
+    @Column(length = FieldSize.NORMAL_TEXT_LEN)
+    private String friendRequestTablePath; // identityHandle@serviceUuid@tableUuid
+
+    @Column(length = FieldSize.NORMAL_TEXT_LEN)
+    private String receivedDmsTablePath; // identityHandle@serviceUuid}@tableUuid
+
     @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)
     private Set<ChatRoom> createdChatRooms;
 

@@ -13,4 +13,6 @@ public class MyUserInfoDto {
     private String handleDomain;
     private String pubKey;
     private ROLES.AuthRoleEnumDto authRole;
+    private String friendRequestTablePath;
+    private String receivedDmsTablePath;
 }
