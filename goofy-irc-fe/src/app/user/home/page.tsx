@@ -396,8 +396,9 @@ export default function Page() {
         const isMember = isMemberOfRoom(room);
         const canJoin = canJoinRoom(room);
         const extra = isMember ? <button onClick={() => {setAndLoadCurrentRoom(room).then()}}>View</button> : ( canJoin ? <button onClick={() => {joinRoom(room).then()}}>Join</button> : <></>);
+        const isCurrRoom = currRoom?.server.serverUrl == room.server.serverUrl && currRoom?.room.name == room.room.name;
 
-        return (<li key={key} title={JSON.stringify(room.room, null, 4)}>{text} {extra}</li>);
+        return (<li key={key} title={JSON.stringify(room.room, null, 4)}>{isCurrRoom ? <b>{text}</b> : text} {extra}</li>);
     }
 
     function renderRoomDetails() {
@@ -485,7 +486,7 @@ export default function Page() {
                     <div className={styles.MainSidebar}>
                         <div className={styles.MainSidebarListBlock}>
                             <h3>Servers</h3>
-                            <ul>{serverList.map((s) => (<li key={s.serverUrl}>{s.serverName}</li>))}</ul>
+                            <ul>{serverList.map((s) => (<li key={s.serverUrl} title={JSON.stringify(s, null, 4)}>{s.serverName}</li>))}</ul>
                             <button onClick={addIrcServer}>Add Goofy IRC Server</button>
                         </div>
                         <hr/>
