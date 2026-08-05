@@ -12,6 +12,13 @@ Currently hosted here: https://fe.goofy-irc.rocc.systems
 * Run the dev server with `npm run dev`
 * Profit?
 
+## TODOs on the Friend System
+* Make the user store their current IRC Server URL on the FIS (public data / services)
+* Host another IRC Server & maybe another Goofy FIS
+* Make the IRC Handle Outgoing Friend Requests to guests (by looking at the FIS public data entry) and send them to the correct IRC
+* Make the IRC Handle Incoming Friend Requests from external IRC Servers correctly
+* Do the same with DMs
+* Cry
 
 
 ## Other Stuff
