@@ -54,7 +54,7 @@ public class ChatRoomEndpoint {
 
     // Get all Rooms I have joined / own
     @GetMapping("/list/my")
-    @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
+    @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
     @IrcEndpoint(summary = "Lists rooms joined/owned by the current user", description = "Returns rooms the user is a member of and rooms they own.")
     public List<ChatRoomDto> getMyRooms(@AuthenticationPrincipal GoofyAuthUser auth) {
         return fromChatRooms(chatRoomRepository.findAllByCreatedBy_Handle_OrMembersContaining(auth.getHandle(), auth.getHandle()), auth.getHandle(), auth.getAdmin());
