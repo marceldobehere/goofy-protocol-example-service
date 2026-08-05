@@ -31,6 +31,7 @@ import {
 
 export default function Page() {
     const [currentMsgText, setCurrentMsgText] = useState<string>("");
+    const [allUnreadMsgs, setAllUnreadMsgs] = useState<Map<string, number>>(new Map())
     const [allMsgs, setAllMsgs] = useState<Map<string, LocalChatMessage[]>>(new Map());
     const [defaultServer, setDefaultServer] = useState<LocalServerData | null>(null);
     const [serverList, setServerList] = useState<LocalServerData[]>([]);
@@ -64,9 +65,27 @@ export default function Page() {
 
     function getOrCreateMsgListForRoom(roomName: string, serverUrl: string): LocalChatMessage[] {
         const key = `${roomName}@${serverUrl}`;
-        if (!allMsgs.has(key))
+        if (!allMsgs.has(key)) {
             allMsgs.set(key, []);
+            allUnreadMsgs.set(key, 0);
+        }
         return allMsgs.get(key)!;
+    }
+
+    function unreadCountForRoom(roomName: string, serverUrl: string, setVal: "IGNORE" | "RESET" | "INC" = "IGNORE"): number {
+        const key = `${roomName}@${serverUrl}`;
+        if (setVal == "IGNORE")
+            return allUnreadMsgs.get(key) ?? 0;
+        else if (setVal == "RESET") {
+            allUnreadMsgs.set(key, 0);
+            return 0;
+        } else if (setVal == "INC") {
+            const val = allUnreadMsgs.get(key) ?? 0;
+            allUnreadMsgs.set(key, val + 1);
+            return val + 1;
+        }
+
+        return 0;
     }
 
     // Message handler that needs to be called indirectly (using Ref) to still have the currentState
@@ -107,11 +126,15 @@ export default function Page() {
 
             const msgs = getOrCreateMsgListForRoom(msgEv.roomName, ws.serverUrl);
             msgs.push(msg);
-            setForceRender(forceRender + 1);
-            if (msgs == currMsgs)
+            if (msgs == currMsgs) {
+                unreadCountForRoom(msgEv.roomName, ws.serverUrl, "RESET");
                 setTimeout(() => {
                     chatUl.current?.scrollTo({top: chatUl.current.scrollHeight, behavior: "smooth"});
                 }, 150);
+            }
+            else
+                unreadCountForRoom(msgEv.roomName, ws.serverUrl, "INC");
+            setForceRender(forceRender + 1);
         }
     }
     // eslint-disable-next-line react-hooks/refs
@@ -419,6 +442,7 @@ export default function Page() {
         try {
             const roomDto = await getAuth<ChatRoomDto>(_room.server.serverUrl + `/api/chatroom/room/${_room.room.name}`);
 
+            unreadCountForRoom(roomDto.name, _room.server.serverUrl, "RESET");
             setCurrMsgs(getOrCreateMsgListForRoom(roomDto.name, _room.server.serverUrl));
             setCurrRoom({room: roomDto, server: _room.server, sameRoomNameInDiffServer: _room.sameRoomNameInDiffServer});
         } catch (err) {
@@ -442,8 +466,9 @@ export default function Page() {
         const canJoin = canJoinRoom(room);
         const extra = isMember ? <button onClick={() => {setAndLoadCurrentRoom(room).then()}}>View</button> : ( canJoin ? <button onClick={() => {joinRoom(room).then()}}>Join</button> : <></>);
         const isCurrRoom = currRoom?.server.serverUrl == room.server.serverUrl && currRoom?.room.name == room.room.name;
+        const unread = unreadCountForRoom(room.room.name, room.server.serverUrl);
 
-        return (<li key={key} title={JSON.stringify(room.room, null, 4)}>{isCurrRoom ? <b>{text}</b> : text} {extra}</li>);
+        return (<li key={key} title={JSON.stringify(room.room, null, 4)}>{isCurrRoom ? <b>{text}</b> : text} {unread == 0 ? "" : `(${unread})`} {extra}</li>);
     }
 
     function renderRoomDetails() {
@@ -495,6 +520,7 @@ export default function Page() {
 
     useGlobalState(true, false, "NONE", async () => {
         setAllMsgs(new Map());
+        setAllUnreadMsgs(new Map());
 
         await prepFisUtils();
 
