@@ -22,6 +22,7 @@ import {
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
 import {deleteAuth, getAuth, postAuth, putAuth} from "@/libs/req";
 import {asymmSignObj, asymmVerifyObj, parsePublicSplitKey, sha256ToText} from "@/libs/crypto";
+import {prepFisUtils} from "@/app/user/home/fis-utils";
 
 export default function Page() {
     const [currentMsgText, setCurrentMsgText] = useState<string>("");
@@ -449,8 +450,7 @@ export default function Page() {
     }
 
     useGlobalState(true, false, "NONE", async () => {
-        // TODO: Init FIS Storage & DB
-        // TODO: have the FIS logic for data storage
+        await prepFisUtils();
 
         setAllMsgs(new Map());
 
@@ -465,8 +465,8 @@ export default function Page() {
         await loadRoomListData(sList);
     });
 
-    // TODO: Add Updating Rooms
-
+    // TODO: Improve Styling + Add Mobile Support
+    // TODO: Allow sending Media Files / Images
     return (
         <main>
             <div className={styles.PageContainer}>
@@ -538,6 +538,7 @@ export default function Page() {
                                 if (e.target.value.trim() != "")
                                     updateMyTyping(true).then();
                             }} onKeyDown={(e) => {
+                                // Seems to not trigger on mobile?
                                 if (e.code == "Enter" && !e.shiftKey) {
                                     updateMyTyping(false).then();
                                     sendMessageToCurrentRoom().then();

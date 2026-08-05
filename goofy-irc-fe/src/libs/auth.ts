@@ -107,3 +107,9 @@ export async function lookUpHandle(handle: string, serverUrl: string | null = nu
     lookUpMap.set(handle, lookup);
     return lookup;
 }
+
+const SUPPORTED_FIS_PROTOCOLS = ["https://", "http://"];
+export async function getFisUrlsFromHandle(handle: string): Promise<string[]> {
+    const lookupRes = await lookUpHandle(handle);
+    return SUPPORTED_FIS_PROTOCOLS.map(protocol => `${protocol}${lookupRes.handleDomain}`);
+}
