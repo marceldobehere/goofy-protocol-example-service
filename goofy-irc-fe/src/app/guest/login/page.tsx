@@ -7,9 +7,8 @@ import {AsymmFullJsonKeypair, AsymmFullKeyPair} from "@/libs/crypto-types";
 import {getStorageMode, saveKeypair, setStorageMode} from "@/libs/auth-store";
 import {useRef, useState} from "react";
 import {readJsonFile, uploadData} from "@/libs/file-utils";
-import {loadLogin} from "@/libs/register";
 import {goPath} from "@/libs/go-path";
-import {isUser} from "@/libs/auth";
+import {isUser, lookUpHandle} from "@/libs/auth";
 import {GlobalState, useGlobalState} from "@/libs/global-state";
 
 export default function Page() {
@@ -91,12 +90,14 @@ export default function Page() {
         }
     }
 
+    // TODO: Update this so you can directly use the keypair and dont need a lookup?
     async function login() {
-        if (usernamePubKey == "" || passwordPrivKey == "") {
+        if (usernamePubKey == "" || passwordPrivKey == "" || derivedHandle == null) {
             alert("Please enter both username and password (or import a keypair)");
             return;
         }
 
+        // Parse Keypair
         let resKeypair;
         try {
             resKeypair = parseFullKeypair({
@@ -104,16 +105,24 @@ export default function Page() {
                 priv: passwordPrivKey
             });
         } catch {
-            const res = await loadLogin(usernamePubKey, passwordPrivKey);
-            if (res == null) {
-                alert("Incorrect Username or Password (or not setup)");
-                return;
-            }
-            resKeypair = res;
+            alert("Invalid Keypair!");
+            return;
         }
 
-        await saveKeypair(resKeypair);
+        // Lookup Domain
+        try {
+            const lookup = await lookUpHandle(derivedHandle);
+            await saveKeypair({
+                ...resKeypair,
+                handleFull: `${lookup.handle}@${lookup.handleDomain}`
+            });
+        } catch (e) {
+            console.error(e);
+            alert("Error looking up details: " + (e as Error).message);
+            return;
+        }
 
+        // User Check
         if (!(await isUser())) {
             await saveKeypair(null);
             alert("Login failed: Not a user");

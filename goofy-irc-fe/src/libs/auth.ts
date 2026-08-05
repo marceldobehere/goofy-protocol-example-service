@@ -68,7 +68,9 @@ export async function logout(): Promise<void> {
     goPath("/guest/login");
 }
 
-
+export interface IdentityAsymmFullKeyPair extends AsymmFullKeyPair {
+    handleFull: string;
+}
 
 export async function importIdentityKeypair(): Promise<ExportIdentityKeypair | null> {
     const importKeypairFile: File | null = await uploadData(false) as File;
@@ -81,11 +83,14 @@ export async function importIdentityKeypair(): Promise<ExportIdentityKeypair | n
     return importKeypairObj;
 }
 
-export async function parseIdentityKeypair(kp: ExportIdentityKeypair): Promise<AsymmFullKeyPair> {
-    return parseFullKeypair({
-        pub: kp.pub,
-        priv: kp.priv
-    })
+export async function parseIdentityKeypair(kp: ExportIdentityKeypair): Promise<IdentityAsymmFullKeyPair> {
+    return {
+        ...parseFullKeypair({
+            pub: kp.pub,
+            priv: kp.priv
+        }),
+        handleFull: kp.handleFull
+    }
 }
 
 // TODO: Store in session storage for x amt of time

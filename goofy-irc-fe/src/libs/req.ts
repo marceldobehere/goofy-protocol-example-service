@@ -1,10 +1,11 @@
 'use client';
 
-import {AsymmFullKeyPair, HttpMethod} from "@/libs/crypto-types";
-import {createSignedRequest, getHeadersFromSignedRequestWithHandle, getHeadersFromSignedRequestWithPubkey} from "@/libs/crypto";
+import {HttpMethod} from "@/libs/crypto-types";
+import {createSignedRequest, getHeadersFromSignedRequestWithHandle, parseFullHandle} from "@/libs/crypto";
 import {AllServerErrorCodes, IrcExceptionDto, RequestError, RequestIrcError} from "@/libs/dtos";
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
 import {SpinActivity} from "@/libs/spinner";
+import {IdentityAsymmFullKeyPair} from "@/libs/auth";
 
 function _isBinaryBody(body: object): body is Uint8Array {
     return body instanceof Uint8Array;
@@ -12,7 +13,7 @@ function _isBinaryBody(body: object): body is Uint8Array {
 
 let overrideDomain: string | null = null;
 
-export async function _internalDoReq<T>(_path: string, method: HttpMethod, body: object | Uint8Array | string | null, keypair: AsymmFullKeyPair | null = null, extraHeaders: Map<string, string> = new Map(), bodyBytes: boolean = false, rawResponse: boolean = false, sendHandle: boolean = true): Promise<T | Response> {
+export async function _internalDoReq<T>(_path: string, method: HttpMethod, body: object | Uint8Array | string | null, keypair: IdentityAsymmFullKeyPair | null = null, extraHeaders: Map<string, string> = new Map(), bodyBytes: boolean = false, rawResponse: boolean = false, sendHandle: boolean = true): Promise<T | Response> {
     const headers: Map<string, string> = new Map(extraHeaders);
     const isBodyStr = body != null && typeof body === "string";
     const isBodyBinary = body != null && _isBinaryBody(body as object);
@@ -29,9 +30,8 @@ export async function _internalDoReq<T>(_path: string, method: HttpMethod, body:
     if (keypair != null) {
         const bodyVal = (body == null) ? null : ((isBodyStr || isBodyBinary) ? body : JSON.stringify(body));
         const req = await createSignedRequest(keypair, method, basePath, bodyVal as Uint8Array | string | null);
-        // TODO: If overrideDomain is not set, use the GlobalState handleDomain + if it is not set for some reason, ask the user ideally
-        // TODO: remove/disable just sending the public key here because for the service we only allow users that have are part of a valid/existing FIS.
-        const reqHeaders = sendHandle ? getHeadersFromSignedRequestWithHandle(req, overrideDomain) : getHeadersFromSignedRequestWithPubkey(req);
+        const parsedFullHandle = parseFullHandle(keypair.handleFull);
+        const reqHeaders = sendHandle ? getHeadersFromSignedRequestWithHandle(req, overrideDomain) : getHeadersFromSignedRequestWithHandle(req, parsedFullHandle.optDomain); // getHeadersFromSignedRequestWithPubkey(req);
         for (const [key, value] of reqHeaders.entries())
             headers.set(key, value);
     }
@@ -102,7 +102,7 @@ export async function _internalDoReq<T>(_path: string, method: HttpMethod, body:
     }
 }
 
-export async function doRequestSpinner<T>(_path: string, method: HttpMethod, body: object | Uint8Array | string | null, keypair: AsymmFullKeyPair | null = null, extraHeaders: Map<string, string> = new Map(), bodyBytes: boolean = false, rawResponse: boolean = false, sendHandle: boolean = true): Promise<T | Response> {
+export async function doRequestSpinner<T>(_path: string, method: HttpMethod, body: object | Uint8Array | string | null, keypair: IdentityAsymmFullKeyPair | null = null, extraHeaders: Map<string, string> = new Map(), bodyBytes: boolean = false, rawResponse: boolean = false, sendHandle: boolean = true): Promise<T | Response> {
     let res;
     await SpinActivity(async () => {
         res = await _internalDoReq<T>(_path, method, body, keypair, extraHeaders, bodyBytes, rawResponse, sendHandle);
@@ -119,10 +119,10 @@ export async function getRawNoAuth(path: string): Promise<Response> {
 export async function getAuth<T>(path: string): Promise<T> {
     return await doRequestSpinner<T>(path, "GET", null, await getKeypair()) as T;
 }
-export async function getFixedAuth<T>(path: string, keypair: AsymmFullKeyPair): Promise<T> {
+export async function getFixedAuth<T>(path: string, keypair: IdentityAsymmFullKeyPair): Promise<T> {
     return await doRequestSpinner<T>(path, "GET", null, keypair) as T;
 }
-export async function getFixedAuthBytes<T>(path: string, keypair: AsymmFullKeyPair): Promise<T> {
+export async function getFixedAuthBytes<T>(path: string, keypair: IdentityAsymmFullKeyPair): Promise<T> {
     return await doRequestSpinner<T>(path, "GET", null, keypair, new Map(), true) as T;
 }
 
@@ -135,10 +135,10 @@ export async function postRawNoAuth(path: string, body: object | string ): Promi
 export async function postAuth<T>(path: string, body: object | string ) {
     return await doRequestSpinner<T>(path, "POST", body, await getKeypair()) as T;
 }
-export async function postFixedAuth<T>(path: string, body: object | string , keypair: AsymmFullKeyPair, extraHeaders: Map<string, string> = new Map()) {
+export async function postFixedAuth<T>(path: string, body: object | string , keypair: IdentityAsymmFullKeyPair, extraHeaders: Map<string, string> = new Map()) {
     return await doRequestSpinner<T>(path, "POST", body, keypair, extraHeaders) as T;
 }
-export async function postFixedAuthDomain<T>(path: string, body: object | string , keypair: AsymmFullKeyPair, extraDomain: string, extraHeaders: Map<string, string> = new Map()) {
+export async function postFixedAuthDomain<T>(path: string, body: object | string , keypair: IdentityAsymmFullKeyPair, extraDomain: string, extraHeaders: Map<string, string> = new Map()) {
     overrideDomain = extraDomain;
     try {
         const res = await doRequestSpinner<T>(path, "POST", body, keypair, extraHeaders) as T;
@@ -159,10 +159,10 @@ export async function deleteRawNoAuth(path: string): Promise<Response> {
 export async function deleteAuth<T>(path: string): Promise<T> {
     return await doRequestSpinner<T>(path, "DELETE", null, await getKeypair()) as T;
 }
-export async function deleteFixedAuth<T>(path: string, keypair: AsymmFullKeyPair): Promise<T> {
+export async function deleteFixedAuth<T>(path: string, keypair: IdentityAsymmFullKeyPair): Promise<T> {
     return await doRequestSpinner<T>(path, "DELETE", null, keypair) as T;
 }
-export async function deleteBodyFixedAuth<T>(path: string, body: object | string, keypair: AsymmFullKeyPair): Promise<T> {
+export async function deleteBodyFixedAuth<T>(path: string, body: object | string, keypair: IdentityAsymmFullKeyPair): Promise<T> {
     return await doRequestSpinner<T>(path, "DELETE", body, keypair) as T;
 }
 
@@ -175,6 +175,6 @@ export async function putRawNoAuth(path: string, body: object | string ): Promis
 export async function putAuth<T>(path: string, body: object | string ) {
     return await doRequestSpinner<T>(path, "PUT", body, await getKeypair()) as T;
 }
-export async function putFixedAuth<T>(path: string, body: object | string , keypair: AsymmFullKeyPair) {
+export async function putFixedAuth<T>(path: string, body: object | string , keypair: IdentityAsymmFullKeyPair) {
     return await doRequestSpinner<T>(path, "PUT", body, keypair) as T;
 }

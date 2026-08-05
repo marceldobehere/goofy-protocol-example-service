@@ -1,8 +1,9 @@
 'use client';
 
-import {AsymmFullKeyPair, AsymmPrivKeyPair, AsymmPubKeyPair} from "@/libs/crypto-types";
+import {AsymmPrivKeyPair, AsymmPubKeyPair} from "@/libs/crypto-types";
 import {parsePrivateSplitKey, parsePublicSplitKey} from "@/libs/crypto";
 import {basePath} from "@/libs/go-path";
+import {IdentityAsymmFullKeyPair} from "@/libs/auth";
 
 // This will be responsible for storing the keypair and loading it (either from SessionStorage or LocalStorage) and maybe secured with a password
 // Other files can then check if there is a keypair loaded
@@ -11,7 +12,7 @@ type StorageMode = "LOCAL_STORAGE" | "SESSION_STORAGE" | "NONE";
 
 let currentStorageMode: StorageMode;
 let currServerBase: string;
-let currKeypair: AsymmFullKeyPair | null;
+let currKeypair: IdentityAsymmFullKeyPair | null;
 let tempServerOverride: string | null;
 
 // TODO: Allow Securing your Service Frontend Client with a password too, (Encrypted Local Storage)
@@ -103,13 +104,13 @@ export async function hasKeypair(): Promise<boolean> {
     await init();
     return currKeypair != null;
 }
-export async function getKeypair(): Promise<AsymmFullKeyPair> {
+export async function getKeypair(): Promise<IdentityAsymmFullKeyPair> {
     await init();
     if (currKeypair == null)
         throw new Error("keypair is undefined");
     return currKeypair;
 }
-export async function saveKeypair(keypair: AsymmFullKeyPair | null) {
+export async function saveKeypair(keypair: IdentityAsymmFullKeyPair | null) {
     await init();
     currKeypair = keypair;
     await _storeKeypair(keypair, currentStorageMode);
@@ -118,14 +119,14 @@ export async function saveKeypair(keypair: AsymmFullKeyPair | null) {
 
 // Internal Storage Mode
 async function _loadStorageMode(): Promise<StorageMode> {
-    let mode = localStorage.getItem("StorageMode") as StorageMode ?? "NONE";
+    let mode = localStorage.getItem(basePath + "/StorageMode") as StorageMode ?? "NONE";
     if (mode == "NONE")
         mode = "SESSION_STORAGE";
-    localStorage.setItem("StorageMode", mode);
+    localStorage.setItem(basePath + "/StorageMode", mode);
     return mode;
 }
 async function _storeStorageMode(mode: StorageMode) {
-    localStorage.setItem("StorageMode", mode);
+    localStorage.setItem(basePath + "/StorageMode", mode);
 }
 
 // Load / Store
@@ -161,26 +162,30 @@ async function _storeServerBase(serverBase: string | null, mode: StorageMode) {
 }
 
 // Internal Keypair
-async function _loadKeypair(mode: StorageMode): Promise<AsymmFullKeyPair | null> {
+async function _loadKeypair(mode: StorageMode): Promise<IdentityAsymmFullKeyPair | null> {
     const pubKeyStr = await _getStore("Login-PubKey", mode);
     const privKeyStr = await _getStore("Login-PrivKey", mode);
-    if (pubKeyStr == null || privKeyStr == null)
+    const fullHandle = await _getStore("Login-FullHandle", mode);
+    if (pubKeyStr == null || privKeyStr == null || fullHandle == null)
         return null;
 
     const pubKey: AsymmPubKeyPair = parsePublicSplitKey(pubKeyStr);
     const privKey: AsymmPrivKeyPair = parsePrivateSplitKey(privKeyStr);
     return {
         pub: pubKey,
-        priv: privKey
+        priv: privKey,
+        handleFull: fullHandle
     };
 }
-async function _storeKeypair(keypair: AsymmFullKeyPair | null, mode: StorageMode) {
+async function _storeKeypair(keypair: IdentityAsymmFullKeyPair | null, mode: StorageMode) {
     if (keypair == null) {
         await _setStore("Login-PubKey", null, mode);
         await _setStore("Login-PrivKey", null, mode);
+        await _setStore("Login-FullHandle", null, mode);
         return;
     }
 
     await _setStore("Login-PubKey", keypair.pub.serialize(), mode);
     await _setStore("Login-PrivKey", keypair.priv.serialize(), mode);
+    await _setStore("Login-FullHandle", keypair.handleFull, mode);
 }

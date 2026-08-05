@@ -31,7 +31,7 @@ export default function Page() {
     const [forceRender, setForceRender] = useState<number>(0);
 
     // Some cursed stuff, dw abt it
-    const lastTypingRoom = useRef<string | null>(null);
+    const lastTypingRoom = useRef<LocalRoomData | null>(null);
     const lastTypingTime = useRef<number | null>(null);
     const typeHandler = useRef(updateMyTyping);
     const msgHandler = useRef(handleMessage);
@@ -130,21 +130,26 @@ export default function Page() {
         // eslint-disable-next-line react-hooks/purity
         const now = Date.now();
         const wasTyping: boolean = lastTypingTime.current != null && now < lastTypingTime.current + TYPING_TIMEOUT;
-        const roomChanged: boolean = lastTypingRoom.current != currRoom?.room.name;
+        const roomChanged: boolean = lastTypingRoom.current != currRoom;
+        const lastServer = lastTypingRoom.current?.server ?? null;
+        const serverChanged: boolean = currRoom?.server != lastServer;
         lastTypingTime.current = (typing ? now : null);
-        lastTypingRoom.current = currRoom?.room.name ?? null;
+        lastTypingRoom.current = currRoom;
 
         // console.debug("TYPING: ", typing, _typing, wasTyping);
 
         if (!typing) {
             if (wasTyping) {
-                await sendToServer(defaultServer, new WsUpdateTyping(null));
+                await sendToServer(lastServer ?? defaultServer, new WsUpdateTyping(null));
             }
             return;
         }
 
         if (typing && (!wasTyping || roomChanged)) {
-            await sendToServer(defaultServer, new WsUpdateTyping(currRoom?.room.name ?? null));
+            if (serverChanged)
+                await sendToServer(lastServer ?? defaultServer, new WsUpdateTyping(null));
+
+            await sendToServer(currRoom?.server ?? defaultServer, new WsUpdateTyping(currRoom?.room.name ?? null));
         }
 
         if (typing && !wasTyping || checkLoop)
@@ -179,20 +184,28 @@ export default function Page() {
         // My Rooms
         const _myRooms: LocalRoomData[] = [];
         for (const server of servers) {
-            const list = await getAuth<ChatRoomDto[]>(server.serverUrl + "/api/chatroom/list/my");
-            list.forEach(room => {
-                _myRooms.push({room, server, sameRoomNameInDiffServer: false});
-            })
+            try {
+                const list = await getAuth<ChatRoomDto[]>(server.serverUrl + "/api/chatroom/list/my");
+                list.forEach(room => {
+                    _myRooms.push({room, server, sameRoomNameInDiffServer: false});
+                })
+            } catch (e) {
+                console.error(`Failed to load my rooms from server ${server.serverName} (${server.serverUrl}):`, e);
+            }
         }
         setMyRoomList(_myRooms);
 
         // All available Rooms (- My Rooms?)
         const _availableRooms: LocalRoomData[] = [];
         for (const server of servers) {
-            const list = await getAuth<ChatRoomDto[]>(server.serverUrl + "/api/chatroom/list/available");
-            list.forEach(room => {
-                _availableRooms.push({room, server, sameRoomNameInDiffServer: false});
-            })
+            try {
+                const list = await getAuth<ChatRoomDto[]>(server.serverUrl + "/api/chatroom/list/available");
+                list.forEach(room => {
+                    _availableRooms.push({room, server, sameRoomNameInDiffServer: false});
+                })
+            } catch (e) {
+                console.error(`Failed to load available rooms from server ${server.serverName} (${server.serverUrl}):`, e);
+            }
         }
 
         // Check all rooms
@@ -305,6 +318,30 @@ export default function Page() {
         }
     }
 
+    async function updateRoom(room: LocalRoomData | null) {
+        if (room == null)
+            return;
+
+        // TODO: Implement
+    }
+
+    async function addIrcServer() {
+        const serverUrl = prompt("Enter a server url");
+        if (serverUrl == null || serverUrl.trim()  == "")
+            return;
+
+        const serverName = prompt("Enter a server name");
+        if (serverName == null || serverName.trim() == "")
+            return;
+
+        // Create Entry
+        const server = await createServerEntry(serverUrl, serverName);
+        const sList = [...serverList, server];
+
+        setServerList(sList);
+        await loadRoomListData(sList);
+    }
+
     async function refreshRoom(roomName: string | null, roomServer: string) {
         if (roomName == null || currRoom == null)
             return;
@@ -357,7 +394,7 @@ export default function Page() {
 
         return <div>
             <p>{currRoom.room.description}</p>
-            <p title={currRoom.room.members?.join(", ")}>Members: {onlineCount}/{currRoom.room.memberCount} (Limit: {currRoom.room.userLimit}), Created by: {currRoom.room.createdByHandle}</p>
+            <p><span title={currRoom.room.members?.join(", ")}>Members: {onlineCount}/{currRoom.room.memberCount}</span> (Limit: {currRoom.room.userLimit}), Created by: {currRoom.room.createdByHandle}</p>
         </div>
     }
 
@@ -435,7 +472,7 @@ export default function Page() {
                         <div className={styles.MainSidebarListBlock}>
                             <h3>Servers</h3>
                             <ul>{serverList.map((s) => (<li key={s.serverUrl}>{s.serverName}</li>))}</ul>
-                            <button>Add IRC Server</button>
+                            <button onClick={addIrcServer}>Add Goofy IRC Server</button>
                         </div>
                         <hr/>
                         {/*<div className={styles.MainSidebarListBlock}>*/}
@@ -463,8 +500,9 @@ export default function Page() {
                                 {renderRoomDetails()}
                                 {currRoom.room.createdByHandle == GlobalState.handle ? (<>
                                     <button>Kick Member</button>
-                                    <button >Ban Member</button>
+                                    <button>Ban Member</button>
                                     <button>Unban Member</button>
+                                    <button onClick={() => {updateRoom(currRoom).then()}}>Update Room Data</button>
                                     <button onClick={() => {deleteRoom(currRoom).then()}}>Delete Room</button>
                                 </>) : (<>
                                     <button onClick={() => {leaveRoom(currRoom).then()}}>Leave Room</button>

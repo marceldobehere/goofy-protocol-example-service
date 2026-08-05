@@ -5,6 +5,8 @@ import {getBaseServerUrl, getKeypair, hasKeypair} from "@/libs/auth-store";
 import {sleep} from "@/libs/utils";
 import {createSignedRequest, getHeadersFromSignedRequestWithHandle,} from "@/libs/crypto";
 import {AsymmFullKeyPair} from "@/libs/crypto-types";
+import {getAuth} from "@/libs/req";
+import {IrcHandleLookupDto} from "@/libs/dtos";
 
 const WS_PATH = "/api/ws";
 const MANAGER_MAP = new Map<string, WsServerManager>();
@@ -15,8 +17,18 @@ export async function clearWsHandlers() {
 }
 
 export async function createServerManager(serverUrl: string): Promise<WsServerManager> {
-    if (!MANAGER_MAP.has(serverUrl))
+    if (!MANAGER_MAP.has(serverUrl)) {
         MANAGER_MAP.set(serverUrl, new WsServerManager(serverUrl, MANAGER_MAP));
+
+        try {
+            const res: IrcHandleLookupDto = await getAuth(`${serverUrl}/api/user/lookup/${GlobalState.handle}`);
+            console.log(res);
+        } catch (e) {
+            console.error(e);
+            alert(`Failed to lookup handle on server ${serverUrl}. This may indicate that the server is not reachable or that your handle is not known/allowed on this server. Error: ${e}`);
+            throw e;
+        }
+    }
 
     const instance = MANAGER_MAP.get(serverUrl)!;
     await instance.initWs();
