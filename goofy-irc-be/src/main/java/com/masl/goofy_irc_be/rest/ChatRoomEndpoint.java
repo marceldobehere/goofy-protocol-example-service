@@ -11,6 +11,7 @@ import com.masl.goofy_irc_be.repository.ChatRoomRepository;
 import com.masl.goofy_irc_be.repository.UserRepository;
 import com.masl.goofy_irc_be.service.WsService;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,6 +142,7 @@ public class ChatRoomEndpoint {
 
     // TODO: Rate Limit
     // Update Chat Room details
+    @Transactional
     @PutMapping("/room/{roomName}")
     @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
     @IrcEndpoint(summary = "Updates chat room details", description = "Updates settings for a chat room.")
@@ -160,9 +162,21 @@ public class ChatRoomEndpoint {
                 throw new RoomInvalid("userLimit invalid");
 
         final boolean nameChanged = !room.getName().equals(updateDto.getName());
+        if (nameChanged) {
+            // Set
+            ChatRoom newRoom = new ChatRoom();
+            newRoom.setName(updateDto.getName());
+            newRoom.setMembers(new HashSet<>(room.getMembers()));
+            newRoom.setBannedUsers(new HashSet<>(room.getBannedUsers()));
+            newRoom.setCreatedBy(room.getCreatedBy());
+            newRoom.setCreatedAt(room.getCreatedAt());
+
+            // Replace
+            chatRoomRepository.deleteByName(room.getName());
+            room = newRoom;
+        }
 
         // Create Entity
-        room.setName(updateDto.getName());
         room.setDescription(updateDto.getDescription());
         room.setUserLimit(updateDto.getUserLimit());
         room.setAllowGuests(updateDto.getAllowGuests());
