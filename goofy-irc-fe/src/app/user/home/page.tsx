@@ -22,7 +22,12 @@ import {
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
 import {deleteAuth, getAuth, postAuth, putAuth} from "@/libs/req";
 import {asymmSignObj, asymmVerifyObj, parsePublicSplitKey, sha256ToText} from "@/libs/crypto";
-import {prepFisUtils} from "@/app/user/home/fis-utils";
+import {
+    addStoredIrcServer,
+    addStoredIrcServerIfDoesntExist, deleteStoredIrcServer,
+    getStoredIrcServerList,
+    prepFisUtils
+} from "@/app/user/home/fis-utils";
 
 export default function Page() {
     const [currentMsgText, setCurrentMsgText] = useState<string>("");
@@ -163,16 +168,32 @@ export default function Page() {
     typeHandler.current = updateMyTyping;
 
 
-    async function loadServerList(server: LocalServerData | null = defaultServer): Promise<LocalServerData[]> {
-        if (server == null)
-            return [];
+    async function loadServerList(): Promise<LocalServerData[]> {
+        // Prepare Server List
+        const baseUrl = await getBaseServerUrl();
+        await addStoredIrcServerIfDoesntExist({serverUrl: baseUrl, serverName: "Current Server"});
 
-        // Load Servers
-        const servers = [server];
-        // TODO: Load servers from FIS
+        // Get List
+        const serverList = await getStoredIrcServerList();
+        console.debug("Stored Server List: ", serverList);
 
-        setServerList(servers);
-        return servers;
+        // Create Servers
+        const serverEntries: LocalServerData[] = [];
+        for (const server of serverList) {
+            try {
+                const serverEntry = await createServerEntry(server.serverUrl, server.serverName);
+                serverEntries.push(serverEntry);
+
+                if (serverEntry.serverUrl == baseUrl)
+                    setDefaultServer(serverEntry);
+            } catch (e) {
+                console.error(e);
+                alert(`Failed to connect to server ${server.serverName} (${server.serverUrl}). This may indicate that the server is not reachable or that your handle is not known/allowed on this server. Error: ${e}`)
+            }
+        }
+
+        setServerList(serverEntries);
+        return serverEntries;
     }
 
     async function loadRoomListData(servers: LocalServerData[] = serverList) {
@@ -351,8 +372,27 @@ export default function Page() {
 
         // Create Entry
         const server = await createServerEntry(serverUrl, serverName);
-        const sList = [...serverList, server];
 
+        // Store in Fis
+        await addStoredIrcServer({serverUrl, serverName});
+
+        const sList = [...serverList, server];
+        setServerList(sList);
+        await loadRoomListData(sList);
+    }
+
+    async function removeIrcServer(server: LocalServerData) {
+        if (!confirm(`Are you sure you want to remove the server ${server.serverName} (${server.serverUrl})?`))
+            return;
+
+        try {
+            await server.ws.destroy();
+        } catch (err) {
+            console.error("Error Closing WS: ", server, err);
+        }
+
+        await deleteStoredIrcServer(server.serverUrl);
+        const sList = serverList.filter((s) => s.serverUrl != server.serverUrl);
         setServerList(sList);
         await loadRoomListData(sList);
     }
@@ -450,16 +490,12 @@ export default function Page() {
     }
 
     useGlobalState(true, false, "NONE", async () => {
-        await prepFisUtils();
-
         setAllMsgs(new Map());
 
-        // Get Server
-        const server = await createServerEntry(await getBaseServerUrl(), "Current Server");
-        setDefaultServer(server);
+        await prepFisUtils();
 
         // Get Server List
-        const sList = await loadServerList(server);
+        const sList = await loadServerList();
 
         // Get Room List
         await loadRoomListData(sList);
@@ -486,7 +522,7 @@ export default function Page() {
                     <div className={styles.MainSidebar}>
                         <div className={styles.MainSidebarListBlock}>
                             <h3>Servers</h3>
-                            <ul>{serverList.map((s) => (<li key={s.serverUrl} title={JSON.stringify(s, null, 4)}>{s.serverName}</li>))}</ul>
+                            <ul>{serverList.map((s) => (<li key={s.serverUrl} title={JSON.stringify(s, null, 4)}>{s.serverName} &nbsp; <button onClick={() => {removeIrcServer(s).then()}}>X</button></li>))}</ul>
                             <button onClick={addIrcServer}>Add Goofy IRC Server</button>
                         </div>
                         <hr/>

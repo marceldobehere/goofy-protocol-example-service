@@ -120,6 +120,26 @@ export class WsServerManager {
             console.debug("[WS INIT] Init Done");
     }
 
+    async destroy() {
+        if (this.#_sock == null)
+            return;
+
+        // Unbind all Socket handlers
+        this.#_sock.onopen = null;
+        this.#_sock.onmessage = null;
+        this.#_sock.onerror = null;
+        this.#_sock.onclose = null;
+
+        // Attempt to close the socket
+        try {
+            this.#_sock.close();
+        } catch {
+
+        } finally {
+            this.#_sock = null;
+        }
+    }
+
     // Internal Handlers
     #_wsOpened() {
         console.debug("[WS] WebSocket opened");

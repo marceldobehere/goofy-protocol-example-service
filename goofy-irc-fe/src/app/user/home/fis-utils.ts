@@ -2,14 +2,20 @@
 
 import {
     createServiceEntry,
-    createTableEntry,
+    createTableEntry, deleteFromTable,
     getAllTableEntries,
-    getServiceEntries, getTablePath,
+    getServiceEntries, getTablePath, insertIntoTable, queryTable,
     updateTableEntry
 } from "@/libs/service-req";
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
 import {getServerDetails, getUserInfo, IdentityAsymmFullKeyPair, setUserInfo} from "@/libs/auth";
-import {LocalTableStructure, ServiceEntryDto, ServiceTableEntryDto} from "@/libs/service-dtos";
+import {
+    LocalTableStructure,
+    ServiceEntryDto,
+    ServiceTableEntryDto,
+    TableBasicQueryDto,
+    TableSelectDto
+} from "@/libs/service-dtos";
 
 const SERVICE_NAME = "DEMO Goofy IRC";
 
@@ -121,16 +127,25 @@ const tableSchemaReceivedDms: LocalTableStructure = {
 // console.log("Bucket Entry: ", res);
 
 // TODO: Manage Concurrent Message Handling with Insert Locks
+
+let currIdentity: IdentityAsymmFullKeyPair | null = null;
+let serviceEntry: ServiceEntryDto | null = null;
+let tableServerList: ServiceTableEntryDto | null = null;
+let tableFriendList: ServiceTableEntryDto | null = null;
+let tableFriendRequests: ServiceTableEntryDto | null = null;
+let tableDms: ServiceTableEntryDto | null = null;
+let tableReceivedDms: ServiceTableEntryDto | null = null;
+
 export async function prepFisUtils() {
-    console.log("FIS Utils init");
+    console.debug("FIS Utils init");
 
     // Prepare Service Entry
-    const identity = await getKeypair();
-    const entryPromise = prepareServiceEntry(identity, SERVICE_NAME);
+    currIdentity = await getKeypair();
+    const entryPromise = prepareServiceEntry(currIdentity, SERVICE_NAME);
 
     // Get Server info, useful for us because we need the handle for perms
     const serverInfo = await getServerDetails();
-    console.log("Server Info: ", serverInfo);
+    // console.log("Server Info: ", serverInfo);
 
     // Assign Perms
     tableSchemaFriendRequests.handlesWithReadPerms = [serverInfo.handle];
@@ -139,37 +154,37 @@ export async function prepFisUtils() {
     tableSchemaReceivedDms.handlesWithWritePerms = [serverInfo.handle];
 
     // Await Promise
-    const entry = await entryPromise;
-    console.log("Service Entry: ", entry);
+    serviceEntry = await entryPromise;
+    console.debug("Service Entry: ", serviceEntry);
 
     // Setup Table for Connected Server List
-    const tableServerListPromise = prepareTable(identity, entry.uuid, tableSchemaServerList);
+    const tableServerListPromise = prepareTable(currIdentity, serviceEntry.uuid, tableSchemaServerList);
     // Setup Table for Friend List
-    const tableFriendListPromise = prepareTable(identity, entry.uuid, tableSchemaFriendList);
+    const tableFriendListPromise = prepareTable(currIdentity, serviceEntry.uuid, tableSchemaFriendList);
     // Setup Table for Friend Requests
-    const tableFriendRequestsPromise = prepareTable(identity, entry.uuid, tableSchemaFriendRequests);
+    const tableFriendRequestsPromise = prepareTable(currIdentity, serviceEntry.uuid, tableSchemaFriendRequests);
     // Setup Table for DM messages (private, should be encrypted)
-    const tableDmsPromise = prepareTable(identity, entry.uuid, tableSchemaDMs);
+    const tableDmsPromise = prepareTable(currIdentity, serviceEntry.uuid, tableSchemaDMs);
     // Setup Table for new DMs (Server can write)
-    const tableReceivedDmsPromise = prepareTable(identity, entry.uuid, tableSchemaReceivedDms);
+    const tableReceivedDmsPromise = prepareTable(currIdentity, serviceEntry.uuid, tableSchemaReceivedDms);
 
     // Await Promises
-    const tableServerList = await tableServerListPromise;
-    console.log("Table ServerList: ", tableServerList);
-    const tableFriendList = await tableFriendListPromise;
-    console.log("Table FriendList: ", tableFriendList);
-    const tableFriendRequests = await tableFriendRequestsPromise;
-    console.log("Table FriendRequests: ", tableFriendRequests);
-    const tableDms = await tableDmsPromise;
-    console.log("Table DMs: ", tableDms);
-    const tableReceivedDms = await tableReceivedDmsPromise;
-    console.log("Table Received DMs: ", tableReceivedDms);
+    tableServerList = await tableServerListPromise;
+    console.debug("Table ServerList: ", tableServerList);
+    tableFriendList = await tableFriendListPromise;
+    console.debug("Table FriendList: ", tableFriendList);
+    tableFriendRequests = await tableFriendRequestsPromise;
+    console.debug("Table FriendRequests: ", tableFriendRequests);
+    tableDms = await tableDmsPromise;
+    console.debug("Table DMs: ", tableDms);
+    tableReceivedDms = await tableReceivedDmsPromise;
+    console.debug("Table Received DMs: ", tableReceivedDms);
 
     // Get User Info and Check Table Paths
     const userInfo = await getUserInfo(true);
     if (userInfo != null) {
-        const friendRequestTablePath = await getTablePath(identity, entry.uuid, tableFriendRequests.tableUuid!);
-        const receivedDmsTablePath = await getTablePath(identity, entry.uuid, tableReceivedDms.tableUuid!);
+        const friendRequestTablePath = await getTablePath(currIdentity, serviceEntry.uuid, tableFriendRequests.tableUuid!);
+        const receivedDmsTablePath = await getTablePath(currIdentity, serviceEntry.uuid, tableReceivedDms.tableUuid!);
 
         // Send IRC Server the Table Paths if needed
         if (userInfo.friendRequestTablePath != friendRequestTablePath || userInfo.receivedDmsTablePath != receivedDmsTablePath) {
@@ -232,6 +247,59 @@ async function prepareTable(identity: IdentityAsymmFullKeyPair, serviceUuid: str
     }
 
     return await createTableEntry(identity, serviceUuid, baseTable);
+}
+
+export interface StoredServerEntry {
+    serverName: string;
+    serverUrl: string;
+}
+
+export async function getStoredIrcServerList(): Promise<StoredServerEntry[]> {
+    const query: TableSelectDto = {
+        colNames: ["server_url", "server_name"]
+    };
+
+    const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableServerList!.tableUuid!, query);
+    // console.log("Query Res", res);
+    const list: StoredServerEntry[] = [];
+    for (const row of res.rows) {
+        list.push({
+            serverUrl: row[0] as string,
+            serverName: row[1] as string
+        });
+    }
+    return list;
+}
+
+export async function addStoredIrcServer(entry: StoredServerEntry) {
+    const insertObj = {
+      "server_url": entry.serverUrl,
+      "server_name": entry.serverName
+    };
+
+    await insertIntoTable(currIdentity!, serviceEntry!.uuid!, tableServerList!.tableUuid!, insertObj);
+}
+
+export async function addStoredIrcServerIfDoesntExist(entry: StoredServerEntry) {
+    const vals = await getStoredIrcServerList();
+    if (vals.find(v => v.serverUrl === entry.serverUrl) != null)
+        return;
+
+    await addStoredIrcServer(entry);
+}
+
+export async function deleteStoredIrcServer(serverUrl: string) {
+    const deleteQuery: TableBasicQueryDto = {
+        where: {
+            type: "C_EQ",
+            conditionParts: [
+                {type: "COL", colName: "server_url"},
+                {type: "VAL", value: serverUrl, valueType: "FIXED_STRING_N"}
+            ]
+        }
+    };
+
+    await deleteFromTable(currIdentity!, serviceEntry!.uuid!, tableServerList!.tableUuid!, deleteQuery);
 }
 
 
