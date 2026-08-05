@@ -458,20 +458,23 @@ export default function Page() {
                     </div>
 
                     <div className={styles.MainChatInput}>
-                        <p>{renderRoomTyping()}</p>
-                        <textarea value={currentMsgText} onChange={(e) => {
-                            setCurrentMsgText(e.target.value);
-                            if (e.target.value.trim() != "")
-                                updateMyTyping(true).then();
-                        }} onKeyDown={(e) => {
-                            if (e.code == "Enter" && !e.shiftKey) {
-                                updateMyTyping(false).then();
-                                sendMessageToCurrentRoom().then();
-                                e.preventDefault();
-                                return false;
-                            }
-                        }} disabled={currRoom == null}></textarea>
-                        <button disabled={currRoom == null} onClick={sendMessageToCurrentRoom}>Send</button>
+                        {/*Stupid ass fix for some reason this works but using the disabled property directly doesn't*/}
+                        {currRoom == null ? (<></>) : (<>
+                            <p>{renderRoomTyping()}</p>
+                            <textarea value={currentMsgText} onChange={(e) => {
+                                setCurrentMsgText(e.target.value);
+                                if (e.target.value.trim() != "")
+                                    updateMyTyping(true).then();
+                            }} onKeyDown={(e) => {
+                                if (e.code == "Enter" && !e.shiftKey) {
+                                    updateMyTyping(false).then();
+                                    sendMessageToCurrentRoom().then();
+                                    e.preventDefault();
+                                    return false;
+                                }
+                            }}></textarea>
+                            <button onClick={sendMessageToCurrentRoom}>Send</button>
+                        </>)}
                     </div>
                 </div>
             </div>

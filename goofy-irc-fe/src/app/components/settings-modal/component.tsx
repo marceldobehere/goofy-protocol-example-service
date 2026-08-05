@@ -15,6 +15,9 @@ export default function Component() {
     const [backendUrl, setBackendUrl] = useState<string | null>(null);
 
     useEffect(() => {
+        if (typeof window == "undefined")
+            return;
+
         (async () => {
             if (storeLocal === null) {
                 const mode = await getStorageMode();
