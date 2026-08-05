@@ -102,6 +102,10 @@
   margin-bottom: 0.5rem;
 }
 
+.InvalidChatEntry {
+  color: red;
+}
+
 .MainChatInput {
   display: grid;
   grid-template-rows: auto 1fr;

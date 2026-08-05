@@ -3,13 +3,25 @@
 import styles from "./page.module.css";
 import Link from "next/link";
 import {GlobalState, useGlobalState} from "@/libs/global-state";
-import {logout} from "@/libs/auth";
+import {logout, lookUpHandle} from "@/libs/auth";
 import {createServerManager, WsServerManager} from "@/libs/ws";
 import {useRef, useState} from "react";
-import {ChatMessageDto, ChatRoomDto, LocalChatMessage, LocalRoomData, LocalServerData, WsGenericEv, WsReceiveMsg, WsSendMsg, WsUpdateRoomData, WsUpdateTyping} from "@/libs/dtos";
+import {
+    ChatMessageDto,
+    ChatRoomDto,
+    IrcHandleLookupDto,
+    LocalChatMessage,
+    LocalRoomData,
+    LocalServerData,
+    WsGenericEv,
+    WsReceiveMsg,
+    WsSendMsg,
+    WsUpdateRoomData,
+    WsUpdateTyping
+} from "@/libs/dtos";
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
 import {deleteAuth, getAuth, postAuth} from "@/libs/req";
-import {asymmSignObj, sha256ToText} from "@/libs/crypto";
+import {asymmSignObj, asymmVerifyObj, parsePublicSplitKey, sha256ToText} from "@/libs/crypto";
 
 export default function Page() {
     const [currentMsgText, setCurrentMsgText] = useState<string>("");
@@ -68,9 +80,15 @@ export default function Page() {
         } else if (genEv.evType == "RECEIVE_MSG") {
             const msgEv = genEv as WsReceiveMsg;
 
-            // TODO: lookup public key and check sig
+            // Lookup identity
+            const lookup: IrcHandleLookupDto = await lookUpHandle(msgEv.senderHandle, ws.serverUrl);
 
-            // TODO: Validate
+            // Validate
+            const valid = await asymmVerifyObj(JSON.parse(msgEv.msgObj), msgEv.sig, parsePublicSplitKey(lookup.pubKey));
+            if (!valid)
+                console.warn(`Invalid signature for message from ${msgEv.senderHandle} in room ${msgEv.roomName} on server ${serverName}`, msgEv, lookup);
+
+            // Create Obj
             const msg: LocalChatMessage = {
                 msgObj: JSON.parse(msgEv.msgObj),
                 handle: msgEv.senderHandle,
@@ -78,6 +96,7 @@ export default function Page() {
                 // eslint-disable-next-line react-hooks/purity
                 timestamp: new Date(Date.now()),
                 sig: msgEv.sig,
+                sigValid: valid
             };
 
             const msgs = getOrCreateMsgListForRoom(msgEv.roomName, ws.serverUrl);
@@ -356,7 +375,7 @@ export default function Page() {
     }
 
     function renderMessage(msg: LocalChatMessage) {
-        return (<li className={styles.MainChatEntry} key={msg.uuid}><span title={msg.timestamp.toLocaleString()}>[{msg.timestamp.toLocaleTimeString()}] </span><b title={JSON.stringify(msg, null, 4)}>{msg.handle}:</b> {msg.msgObj.msg}</li>);
+        return (<li className={`${styles.MainChatEntry} ${msg.sigValid ? "" : styles.InvalidChatEntry}`} key={msg.uuid}><span title={msg.timestamp.toLocaleString()}>{msg.sigValid ? "" : "⚠ "}[{msg.timestamp.toLocaleTimeString()}] </span><b title={JSON.stringify(msg, null, 4)}>{msg.handle}:</b> {msg.msgObj.msg}</li>);
     }
 
     async function sendMessageToCurrentRoom() {

@@ -1,8 +1,8 @@
 'use client';
 
-import {ExportIdentityKeypair, MyUserInfoDto} from "@/libs/dtos";
-import {getAuth} from "@/libs/req";
-import {getKeypair, hasKeypair, saveKeypair} from "@/libs/auth-store";
+import {ExportIdentityKeypair, IrcHandleLookupDto, MyUserInfoDto} from "@/libs/dtos";
+import {getAuth, getNoAuth} from "@/libs/req";
+import {getBaseServerUrl, getKeypair, hasKeypair, saveKeypair} from "@/libs/auth-store";
 import {deriveHandleFromPublicSplitKey, parseFullKeypair} from "@/libs/crypto";
 import {goPath} from "@/libs/go-path";
 import {readJsonFile, uploadData} from "@/libs/file-utils";
@@ -86,4 +86,19 @@ export async function parseIdentityKeypair(kp: ExportIdentityKeypair): Promise<A
         pub: kp.pub,
         priv: kp.priv
     })
+}
+
+// TODO: Store in session storage for x amt of time
+const lookUpMap = new Map<string, IrcHandleLookupDto>();
+export async function lookUpHandle(handle: string, serverUrl: string | null = null): Promise<IrcHandleLookupDto> {
+    if (serverUrl == null)
+        serverUrl = await getBaseServerUrl();
+
+    const entry = lookUpMap.get(handle);
+    if (entry != null)
+        return entry;
+
+    const lookup: IrcHandleLookupDto = await getNoAuth(`${serverUrl}/api/user/lookup/${handle}`);
+    lookUpMap.set(handle, lookup);
+    return lookup;
 }

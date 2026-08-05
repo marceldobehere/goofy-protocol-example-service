@@ -95,7 +95,12 @@ export async function asymmSignObj<T>(obj: T, privSplitKey: AsymmPrivKeyPair): P
 }
 
 export async function asymmVerifyObj<T>(obj: T, signature: EncodedSignature, pubSplitKey: AsymmPubKeyPair): Promise<boolean> {
-    return await asymmCrypto.verifyStr(JSON.stringify(obj), signature, pubSplitKey.serialize());
+    try {
+        return await asymmCrypto.verifyStr(JSON.stringify(obj), signature, pubSplitKey.serialize());
+    } catch (e) {
+        console.warn("Failed to verify object signature:", e);
+        return false;
+    }
 }
 
 // Symmetric Stuff

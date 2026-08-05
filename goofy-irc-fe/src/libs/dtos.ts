@@ -236,4 +236,13 @@ export interface LocalChatMessage {
     timestamp: Date;
     uuid: string;
     sig: string;
+    sigValid: boolean;
+}
+
+
+export interface IrcHandleLookupDto {
+    handle: string;
+    handleDomain: string;
+    pubKey: string;
+    registeredHere: boolean;
 }
