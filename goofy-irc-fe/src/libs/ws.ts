@@ -6,7 +6,6 @@ import {sleep} from "@/libs/utils";
 import {createSignedRequest, getHeadersFromSignedRequestWithHandle,} from "@/libs/crypto";
 import {AsymmFullKeyPair} from "@/libs/crypto-types";
 import {getAuth} from "@/libs/req";
-import {IrcHandleLookupDto} from "@/libs/dtos";
 
 const WS_PATH = "/api/ws";
 const MANAGER_MAP = new Map<string, WsServerManager>();
@@ -21,8 +20,8 @@ export async function createServerManager(serverUrl: string): Promise<WsServerMa
         MANAGER_MAP.set(serverUrl, new WsServerManager(serverUrl, MANAGER_MAP));
 
         try {
-            const res: IrcHandleLookupDto = await getAuth(`${serverUrl}/api/user/lookup/${GlobalState.handle}`);
-            console.log(res);
+            // Attempt a lookup, this also triggers the domain and handle being stored at the other server
+            await getAuth(`${serverUrl}/api/user/lookup/${GlobalState.handle}`);
         } catch (e) {
             console.error(e);
             alert(`Failed to lookup handle on server ${serverUrl}. This may indicate that the server is not reachable or that your handle is not known/allowed on this server. Error: ${e}`);
