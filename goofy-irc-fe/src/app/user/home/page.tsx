@@ -197,8 +197,12 @@ export default function Page() {
     }
 
     async function loadRoomListData(servers: LocalServerData[] = serverList) {
-        if (servers.length == 0)
+        if (servers.length == 0) {
+            setMyRoomList([]);
+            setAvailableRoomList([]);
+            await setAndLoadCurrentRoom(null);
             return;
+        }
 
         // My DMs
         // setDmList([]);

@@ -124,6 +124,8 @@ export class WsServerManager {
         if (this.#_sock == null)
             return;
 
+        console.debug("[WS] Destroying WebSocket connection");
+
         // Unbind all Socket handlers
         this.#_sock.onopen = null;
         this.#_sock.onmessage = null;
