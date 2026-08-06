@@ -40,10 +40,12 @@ export async function init() {
     const urlParams = new URLSearchParams(window.location.search);
     const overrideBackendUrl = urlParams.get("overrideBackendUrl");
     if (overrideBackendUrl) {
-        console.log("Override backend url: ", overrideBackendUrl);
-        if (confirm(`The source redirecting you here wants the Server URL to be changed to ${overrideBackendUrl}. If this is expected and wanted, please click OK, otherwise click Cancel to ignore this request.`)) {
-            await setBaseServerUrl(overrideBackendUrl);
-        }
+        console.log("Attempting to override backend url: ", overrideBackendUrl);
+
+        if (overrideBackendUrl != currServerBase)
+            if (confirm(`The source redirecting you here wants the Server URL to be changed to ${overrideBackendUrl}. If this is expected and wanted, please click OK, otherwise click Cancel to ignore this request.`))
+                await setBaseServerUrl(overrideBackendUrl);
+
 
         // Remove from URL
         const newUrl = new URL(window.location.href);
