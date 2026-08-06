@@ -26,7 +26,7 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
   * Join & Leave Rooms
   * Room Passwords
   * Member Management (Kick & Ban)
-  * Update Room Data
+  * Update Room Data (Name, Description, Join Settings, Password, etc.)
 * Live WebSocket Message Exchange
   * Verifiable Message Signatures
   * Support for sending Media (Images, Videos, Files, etc.) **(TODO)**
@@ -48,7 +48,14 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
   * Option to allow Guests to participate in Rooms
   * Friend Requests & DMs can be sent cross IRC Servers **(TODO)**
   * "Link" your IRC Server URL/Instance on your public FIS Entry **(TODO)**
-  * Easy to self-host your own IRC Instance using Docker have functional federation!
+  * Self-hosted instances should automatically have working federation!
+* Easy to self-host and run locally
+  * Run locally with just Java and NodeJS
+  * Self-host using docker
+  * Don't need crazy hardware
+    * Memory Footpring isn't crazy
+    * Minimal Storage needs
+    * Performance is good enough to run on my Raspberry PI 5
 * Persistence & Sync
   * Friend Requests, Server Lists, DMs, etc. are stored on the Users FIS
     * Since it's stored on the FIS, the data is basically synced between all Clients of a User
