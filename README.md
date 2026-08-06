@@ -5,17 +5,20 @@ It is mostly meant as a Showcase/Guide/Reference for how to create Services for 
 
 In the Goofy IRC you can create Chat Rooms and write in real-time with people, similar to an IRC.
 
-## Structure
-This repo contains a static [NextJS Frontend](./goofy-irc-fe/) and a [Java Backend](./goofy-irc-be/).
 
-It is currently hosted here: https://fe.goofy-irc.rocc.systems 
+## Structure
+This Repository contains a static [NextJS Frontend](./goofy-irc-fe/) and a [Java Backend](./goofy-irc-be/).
+
+This Repository also (currently) contains the source of the (Goofy Protocol) Core Crypto Library for JS with TS bindings.
+
+It is currently hosted here: https://goofy-irc.rocc.systems 
 
 If you want to try it out, please read [this section](#how-can-i-try-it)!
 
 
 ## Features
 * Registering
-  * Registering using Register Code & Automatic Registering from supported FIS Domains!
+  * Registering using a Register Code & Automatic Registering from supported FIS Domains!
   * No need for Emails, Phone numbers or other personal verification, only a link to your FIS Instance
 * Chat Rooms
   * View all Chatrooms you are part of and that are available
@@ -58,6 +61,7 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
   * Users have full Sovereignty over their data!
   * Automatic globally unique UserIDs/Handles
   * Automatic Support for E2E Symmetric & Asymmetric Encryption
+  * Strongly Documented API Specs (Swagger UI)
 
 
 ## Screenshots
