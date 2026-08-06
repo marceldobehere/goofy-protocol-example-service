@@ -245,7 +245,7 @@ public class ChatRoomEndpoint {
 
     // Leave Chat Room (cant leave it yourself, need to delete it instead)
     @PostMapping("/room/{roomName}/leave")
-    @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
+    @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
     @IrcEndpoint(summary = "Leaves a chat room")
     public void leaveRoom(@PathVariable String roomName, @AuthenticationPrincipal GoofyAuthUser auth) throws RoomNotFound, RoomActionNotAllowed {
         // Check if Room exists
