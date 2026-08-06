@@ -43,19 +43,20 @@ public class UserEndpoint {
     @IrcEndpoint(summary = "Gets Information for the current User", description = "This Endpoint returns information about the current user/identity, including their handle, public key, and authentication role.")
     public MyUserInfoDto myInfo(@AuthenticationPrincipal GoofyAuthUser auth) {
         User user = userRepository.findByHandle(auth.getHandle());
-        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath());
+        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath(), user.getFriendListTablePath());
     }
 
     // Update My User Info
     @PutMapping("/info")
     @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
-    @IrcEndpoint(summary = "Updates Information for the current User", description = "You can update: `friendRequestTablePath` and `receivedDmsTablePath`. The format is `identityHandle@serviceUuid@tableUuid`")
+    @IrcEndpoint(summary = "Updates Information for the current User", description = "You can update: `friendRequestTablePath`, `friendListTablePath` and `receivedDmsTablePath`. The format is `identityHandle@serviceUuid@tableUuid`")
     public MyUserInfoDto updateMyInfo(@AuthenticationPrincipal GoofyAuthUser auth, @Valid @RequestBody MyUserInfoDto updateDto) {
         User user = userRepository.findByHandle(auth.getHandle());
         user.setFriendRequestTablePath(updateDto.getFriendRequestTablePath());
         user.setReceivedDmsTablePath(updateDto.getReceivedDmsTablePath());
+        user.setFriendListTablePath(updateDto.getFriendListTablePath());
         userRepository.save(user);
-        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath());
+        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath(), user.getFriendListTablePath());
     }
 
     @DeleteMapping("/delete")

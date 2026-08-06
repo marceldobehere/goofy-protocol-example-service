@@ -15,4 +15,5 @@ public class MyUserInfoDto {
     private ROLES.AuthRoleEnumDto authRole;
     private String friendRequestTablePath;
     private String receivedDmsTablePath;
+    private String friendListTablePath;
 }

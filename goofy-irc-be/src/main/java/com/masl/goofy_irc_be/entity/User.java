@@ -45,6 +45,9 @@ public class User {
     private String friendRequestTablePath; // identityHandle@serviceUuid@tableUuid
 
     @Column(length = FieldSize.NORMAL_TEXT_LEN)
+    private String friendListTablePath; // identityHandle@serviceUuid@tableUuid
+
+    @Column(length = FieldSize.NORMAL_TEXT_LEN)
     private String receivedDmsTablePath; // identityHandle@serviceUuid}@tableUuid
 
     @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)
