@@ -27,6 +27,10 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
   * Room Passwords
   * Member Management (Kick & Ban)
   * Update Room Data (Name, Description, Join Settings, Password, etc.)
+* Profile Settings **(TODO)**
+  * Set a custom PFP
+  * Have a little account Bio / Description
+  * Potentially have nicknames? (I might limit that to friends only)
 * Live WebSocket Message Exchange
   * Verifiable Message Signatures
   * Support for sending Media (Images, Videos, Files, etc.) **(TODO)**
@@ -96,6 +100,9 @@ You should never trust strangers Goofy Protocol FIS or Service Clients and alway
 
 The frontend currently temporarily stores your keypair in localStorage, I will add support for storing it encrypted at rest at a later point. (For now you can choose to store it in Session Storage or use it in a safe environment / don't do sensitive stuff)
 
+If you verify that a handle belongs to a person, then MITM attacks should not be possible, unless the account has been compromised. Since the handle is derived from the public key it can always be verified. The only potential issue is a Service/FIS creating a temporary account with a random that acts as a middleman. 
+
+You should therefore always check the handle of people on some secure channel. If the "MITM attack" is done by an automated system, this check could be semi-automated / integrated and I have plans to implement some check like that in the future.
 
 ## Resources
 * [Goofy Protocol](https://github.com/marceldobehere/goofy-protocol) (WIP/TODO, Very messy)
