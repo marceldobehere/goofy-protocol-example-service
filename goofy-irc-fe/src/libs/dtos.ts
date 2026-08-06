@@ -84,6 +84,7 @@ export interface MyUserInfoDto {
     isRestricted: boolean;
     friendRequestTablePath: string;
     receivedDmsTablePath: string;
+    friendListTablePath: string;
 }
 
 export interface RegistrationRequestDto {
