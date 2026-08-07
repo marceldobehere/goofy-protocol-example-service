@@ -56,8 +56,8 @@ export async function createServiceEntry(identityKeypair: IdentityAsymmFullKeyPa
     await fisReq(identityKeypair.handleFull, postFixedAuth, "/fis-api/service-entry", newEntry, identityKeypair);
 }
 
-export async function uploadBucketEntry(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, readAccess: string[] = ["*"]): Promise<ServiceBucketEntryDto | null> {
-    const data: File | null = await uploadData(false) as File;
+export async function uploadBucketEntry(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, readAccess: string[] = ["*"], forceData: File | null = null): Promise<ServiceBucketEntryDto | null> {
+    const data: File | null = forceData ?? await uploadData(false) as File;
     if (data == null)
         return null;
 

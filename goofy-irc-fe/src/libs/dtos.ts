@@ -76,6 +76,8 @@ export interface RegisterStatusDto {
 
 export type AuthRole = "OUTSIDE_ENTITY" | "REGISTERED_USER" | "ADMIN";
 
+export type FriendRequestSetting = "DENY" | "ALLOW_SAME_SERVER" | "ALLOW_ANY_ROOM_MEMBER" | "ALLOW_ALL";
+
 export interface MyUserInfoDto {
     handle: string;
     handleDomain: string;
@@ -85,6 +87,7 @@ export interface MyUserInfoDto {
     friendRequestTablePath: string;
     receivedDmsTablePath: string;
     friendListTablePath: string;
+    friendRequestSetting: FriendRequestSetting;
 }
 
 export interface RegistrationRequestDto {
@@ -193,6 +196,7 @@ export class WsSendMsg extends WsGenericEv {
 
 export interface ChatMessageDto {
     msg: string;
+    filePaths: string[];
 }
 
 export class WsUpdateRoomData extends WsGenericEv {

@@ -24,12 +24,12 @@ export const GlobalState: {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 async function runMaybeAsyncCallback(fn: Function | undefined): Promise<void> {
-    if (fn === undefined)
+    if (!fn)
         return;
     try {
         await fn();
     } catch (e) {
-        console.info("> Error in callback: ", e);
+        console.error("> Error in callback: ", e);
     }
 }
 
@@ -38,10 +38,11 @@ export type FragmentNeed = "NONE" | "IDENTITY" | "IDENTITY@SERVICE";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 export function useAsyncEffect(callback: Function, deps: unknown[]) {
+    const pathName = usePathname();
     useEffect(() => {
         runMaybeAsyncCallback(callback).then();
     // eslint-disable-next-line
-    }, deps);
+    }, [...deps, pathName]);
 }
 
 export function isNetworkErrorTypeError(err: unknown): err is TypeError {

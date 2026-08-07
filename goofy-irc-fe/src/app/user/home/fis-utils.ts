@@ -2,22 +2,27 @@
 
 import {
     createServiceEntry,
-    createTableEntry, deleteFromTable,
+    createTableEntry, deleteFromTable, fisReq,
     getAllTableEntries,
     getServiceEntries, getTablePath, insertIntoTable, queryTable,
-    updateTableEntry
+    updateTableEntry, uploadBucketEntry
 } from "@/libs/service-req";
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
-import {getServerDetails, getUserInfo, IdentityAsymmFullKeyPair, setUserInfo} from "@/libs/auth";
+import {getServerDetails, getUserInfo, IdentityAsymmFullKeyPair, lookUpHandle, setUserInfo} from "@/libs/auth";
 import {
-    LocalTableStructure,
-    ServiceEntryDto,
+    IdentityPublicData,
+    LocalTableStructure, PublicGoofyIrcData, ServiceBucketEntryDto,
+    ServiceEntryDto, ServicePublicDataUpdate,
     ServiceTableEntryDto,
     TableBasicQueryDto,
     TableSelectDto
 } from "@/libs/service-dtos";
+import {getFixedAuth, getFixedAuthBytes, putFixedAuth} from "@/libs/req";
+import {deriveHandleFromPublicSplitKey} from "@/libs/crypto";
+import {IrcHandleLookupDto} from "@/libs/dtos";
 
 const SERVICE_NAME = "DEMO Goofy IRC";
+const PUBLIC_SERVICE_NAME = "Goofy IRC";
 
 // To store the server list
 const tableSchemaServerList: LocalTableStructure = {
@@ -120,12 +125,6 @@ const tableSchemaReceivedDms: LocalTableStructure = {
     }]
 }
 
-// TODO: Implement or remove
-// // Test Upload
-// console.log("Test Upload");
-// const res = await uploadBucketEntry(identity, entry.uuid);
-// console.log("Bucket Entry: ", res);
-
 // TODO: Manage Concurrent Message Handling with Insert Locks
 
 let currIdentity: IdentityAsymmFullKeyPair | null = null;
@@ -198,6 +197,15 @@ export async function prepFisUtils() {
         }
     }
 
+    // Link IRC Server to FIS Identity Entry if needed
+    const publicFisData: IdentityPublicData = await getPublicFisData();
+    if (!publicFisData.services[PUBLIC_SERVICE_NAME] && confirm(`You haven't set up your FIS Identity with the Goofy IRC Service yet. Would you like to link it?`)) {
+        const newData: PublicGoofyIrcData = {
+            serverUrl: await getBaseServerUrl()
+        };
+        await setPublicFisData(newData);
+    }
+
     // TODO: maybe move that to diff methods
     // Lock "New DMs" Table, process messages, unlock Table
     // Update DM Status (unread messages, etc.)
@@ -212,9 +220,6 @@ async function prepareServiceEntry(identity: IdentityAsymmFullKeyPair, name: str
     const maybeEntry = entries.find(e => e.name === name);
     if (maybeEntry)
         return maybeEntry;
-
-    // Does not exist!
-    // TODO: Link IRC Server to FIS Identity Entry
 
     // Create
     await createServiceEntry(identity, name, await getBaseServerUrl());
@@ -306,11 +311,97 @@ export async function deleteStoredIrcServer(serverUrl: string) {
     await deleteFromTable(currIdentity!, serviceEntry!.uuid!, tableServerList!.tableUuid!, deleteQuery);
 }
 
+export async function getPublicFisData(): Promise<IdentityPublicData> {
+    const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
+    return await fisReq(currIdentity!.handleFull, getFixedAuth, `/fis-api/identity-storage/public/${identityHandle}`, currIdentity);
+}
+
+export async function setPublicFisData(newData: PublicGoofyIrcData) {
+    const updateDto: ServicePublicDataUpdate = {
+        serverName: PUBLIC_SERVICE_NAME,
+        newData
+    };
+
+    // Check if data matches already
+    const currData = await getPublicFisData();
+    if (JSON.stringify(currData.services[PUBLIC_SERVICE_NAME]) == JSON.stringify(newData))
+        return;
+
+    // Get URL and open
+    const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
+    const resUrl: string = await fisReq(currIdentity!.handleFull, putFixedAuth, `/fis-api/redirect/update-public-identity-entry/${identityHandle}`, updateDto, currIdentity);
+    window.open(resUrl, "_blank")?.focus();
+}
+
+export async function uploadFisData(data: File): Promise<string | null> {
+    const res = await uploadBucketEntry(currIdentity!, serviceEntry!.uuid, ["*"], data);
+    const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
+    return res == null ? null : `${identityHandle}@${serviceEntry?.uuid}@${res.fileUuid}`;
+}
+
+export async function uploadPfp()  {
+    const res = await uploadBucketEntry(currIdentity!, serviceEntry!.uuid);
+    if (res == null)
+        return;
+
+    const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
+
+    const data = await getPublicFisData();
+    const service = data.services[PUBLIC_SERVICE_NAME];
+    service.pfpPath = `${identityHandle}@${serviceEntry?.uuid}@${res.fileUuid}`;
+    await setPublicFisData(service);
+}
+
+export async function setDescription() {
+    const desc = prompt("Enter a new description for your profile");
+    if (desc == null)
+        return;
+
+    const data = await getPublicFisData();
+    const service = data.services[PUBLIC_SERVICE_NAME];
+    service.description = desc;
+    await setPublicFisData(service);
+}
+
+export async function findPublicDataForHandle(handle: string, ircServerBase: string): Promise<PublicGoofyIrcData | null> {
+    try {
+        const lookup: IrcHandleLookupDto = await lookUpHandle(handle, ircServerBase);
+        const data: IdentityPublicData = await fisReq(`${lookup.handle}@${lookup.handleDomain}`, getFixedAuth, `/fis-api/identity-storage/public/${handle}`, currIdentity);
+        return data.services[PUBLIC_SERVICE_NAME] ?? null;
+    } catch (e) {
+        console.debug(`Failed to fetch info for handle ${handle} on server ${ircServerBase}:`, e);
+    }
+    return null;
+}
+
+export interface BucketData {
+    details: ServiceBucketEntryDto;
+    blob: Blob;
+    blobUrl: string;
+}
+
+export async function getFisBucketData(mediaPath: string, roomServerUrl: string, maxSize: number = 10_000_000): Promise<BucketData> {
+    const parts = mediaPath.split("@");
+
+    const lookup: IrcHandleLookupDto = await lookUpHandle(parts[0], roomServerUrl);
+    const fullHandle = `${lookup.handle}@${lookup.handleDomain}`;
 
 
+    // Load Data
+    const details: ServiceBucketEntryDto = await fisReq(fullHandle, getFixedAuth, `/fis-api/service-bucket/${lookup.handle}/${parts[1]}/entry/${parts[2]}`, currIdentity!);
+    if (details.contentSize! > maxSize)
+        throw new Error(`File size ${details.contentSize} exceeds max size ${maxSize}`);
+    const data: Uint8Array = await fisReq(fullHandle, getFixedAuthBytes, `/fis-api/service-bucket/${lookup.handle}/${parts[1]}/content/${parts[2]}`, currIdentity!);
 
-
-
+    // Create Blob URL
+    const blob = new Blob([data as BlobPart], { type: details.contentType });
+    const url = URL.createObjectURL(blob);
+    return {
+        details,
+        blob,
+        blobUrl: url
+    }
+}
 
 
 const compArrays = (arr1: unknown[], arr2: unknown[]): boolean => {

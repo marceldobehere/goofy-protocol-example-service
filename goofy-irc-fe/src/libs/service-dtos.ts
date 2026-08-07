@@ -188,3 +188,18 @@ export interface TableUpdateDto {
     colValues: never[];
     basicQuery?: TableBasicQueryDto;
 }
+
+export interface IdentityPublicData {
+    services: Record<string, PublicGoofyIrcData>;
+}
+
+export interface ServicePublicDataUpdate {
+    serverName: string;
+    newData: object;
+}
+
+export interface PublicGoofyIrcData {
+    serverUrl: string;
+    pfpPath?: string; //idHandle@serviceUuid@fileUuid
+    description?: string;
+}

@@ -1,7 +1,10 @@
 'use client';
 
 import {HttpMethod} from "@/libs/crypto-types";
-import {createSignedRequest, getHeadersFromSignedRequestWithHandle, parseFullHandle} from "@/libs/crypto";
+import {
+    createSignedRequest, getHeadersFromSignedRequestWithHandle,
+    getHeadersFromSignedRequestWithPubkey, parseFullHandle
+} from "@/libs/crypto";
 import {AllServerErrorCodes, IrcExceptionDto, RequestError, RequestIrcError} from "@/libs/dtos";
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
 import {SpinActivity} from "@/libs/spinner";
@@ -13,7 +16,7 @@ function _isBinaryBody(body: object): body is Uint8Array {
 
 let overrideDomain: string | null = null;
 
-export async function _internalDoReq<T>(_path: string, method: HttpMethod, body: object | Uint8Array | string | null, keypair: IdentityAsymmFullKeyPair | null = null, extraHeaders: Map<string, string> = new Map(), bodyBytes: boolean = false, rawResponse: boolean = false, sendHandle: boolean = true): Promise<T | Response> {
+export async function _internalDoReq<T>(_path: string, method: HttpMethod, body: object | Uint8Array | string | null, keypair: IdentityAsymmFullKeyPair | null = null, extraHeaders: Map<string, string> = new Map(), bodyBytes: boolean = false, rawResponse: boolean = false, sendStep: 'HANDLE' | 'HANDLE_DOMAIN' | 'PUB_KEY' = 'HANDLE'): Promise<T | Response> {
     const headers: Map<string, string> = new Map(extraHeaders);
     const isBodyStr = body != null && typeof body === "string";
     const isBodyBinary = body != null && _isBinaryBody(body as object);
@@ -31,7 +34,11 @@ export async function _internalDoReq<T>(_path: string, method: HttpMethod, body:
         const bodyVal = (body == null) ? null : ((isBodyStr || isBodyBinary) ? body : JSON.stringify(body));
         const req = await createSignedRequest(keypair, method, basePath, bodyVal as Uint8Array | string | null);
         const parsedFullHandle = parseFullHandle(keypair.handleFull);
-        const reqHeaders = sendHandle ? getHeadersFromSignedRequestWithHandle(req, overrideDomain) : getHeadersFromSignedRequestWithHandle(req, parsedFullHandle.optDomain); // getHeadersFromSignedRequestWithPubkey(req);
+        const reqHeaders = sendStep == "HANDLE" ? getHeadersFromSignedRequestWithHandle(req, overrideDomain) : (
+            sendStep == "HANDLE_DOMAIN" ? getHeadersFromSignedRequestWithHandle(req, parsedFullHandle.optDomain) :
+            getHeadersFromSignedRequestWithPubkey(req)
+        );
+
         for (const [key, value] of reqHeaders.entries())
             headers.set(key, value);
     }
@@ -53,12 +60,12 @@ export async function _internalDoReq<T>(_path: string, method: HttpMethod, body:
     // console.log(`< Received Response from ${path} with status ${res.status} and ok=${res.ok}`, res);
 
     // Check for PublicKeyLookupFailed Error (if sendHandle is enabled) and retry if needed
-    if (keypair != null && sendHandle && !res.ok) {
+    if (keypair != null && sendStep != "PUB_KEY" && !res.ok) {
         const resBodyStr = await res.text();
         try {
             const resBody = JSON.parse(resBodyStr);
             if (resBody satisfies IrcExceptionDto && (resBody as IrcExceptionDto).errorCode == AllServerErrorCodes.PUBLIC_KEY_LOOKUP_FAILED ) {
-                return await doRequestSpinner<T>(_path, method, body, keypair, extraHeaders, bodyBytes, rawResponse, false);
+                return await doRequestSpinner<T>(_path, method, body, keypair, extraHeaders, bodyBytes, rawResponse, sendStep == "HANDLE" ? "HANDLE_DOMAIN" : "PUB_KEY");
             }
         } catch (e) {
             if (e instanceof RequestError || e instanceof RequestIrcError)
@@ -102,10 +109,10 @@ export async function _internalDoReq<T>(_path: string, method: HttpMethod, body:
     }
 }
 
-export async function doRequestSpinner<T>(_path: string, method: HttpMethod, body: object | Uint8Array | string | null, keypair: IdentityAsymmFullKeyPair | null = null, extraHeaders: Map<string, string> = new Map(), bodyBytes: boolean = false, rawResponse: boolean = false, sendHandle: boolean = true): Promise<T | Response> {
+export async function doRequestSpinner<T>(_path: string, method: HttpMethod, body: object | Uint8Array | string | null, keypair: IdentityAsymmFullKeyPair | null = null, extraHeaders: Map<string, string> = new Map(), bodyBytes: boolean = false, rawResponse: boolean = false, sendStep: 'HANDLE' | 'HANDLE_DOMAIN' | 'PUB_KEY' = 'HANDLE'): Promise<T | Response> {
     let res;
     await SpinActivity(async () => {
-        res = await _internalDoReq<T>(_path, method, body, keypair, extraHeaders, bodyBytes, rawResponse, sendHandle);
+        res = await _internalDoReq<T>(_path, method, body, keypair, extraHeaders, bodyBytes, rawResponse, sendStep);
     });
     return res as T | Response;
 }

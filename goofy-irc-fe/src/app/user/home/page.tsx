@@ -24,15 +24,18 @@ import {deleteAuth, getAuth, postAuth, putAuth} from "@/libs/req";
 import {asymmSignObj, asymmVerifyObj, parsePublicSplitKey, sha256ToText} from "@/libs/crypto";
 import {
     addStoredIrcServer,
-    addStoredIrcServerIfDoesntExist, deleteStoredIrcServer,
+    addStoredIrcServerIfDoesntExist, deleteStoredIrcServer, findPublicDataForHandle,
     getStoredIrcServerList,
-    prepFisUtils
+    prepFisUtils, setDescription, uploadFisData, uploadPfp
 } from "@/app/user/home/fis-utils";
+import LazyMedia from "@/app/components/lazy-media/component";
+import {PublicGoofyIrcData} from "@/libs/service-dtos";
 
 export default function Page() {
     const [currentMsgText, setCurrentMsgText] = useState<string>("");
-    const [allUnreadMsgs, setAllUnreadMsgs] = useState<Map<string, number>>(new Map())
+    const [allUnreadMsgs, setAllUnreadMsgs] = useState<Map<string, number>>(new Map());
     const [allMsgs, setAllMsgs] = useState<Map<string, LocalChatMessage[]>>(new Map());
+    const [allPublicData, setAllPublicData] = useState<Map<string, PublicGoofyIrcData | null>>(new Map());
     const [defaultServer, setDefaultServer] = useState<LocalServerData | null>(null);
     const [serverList, setServerList] = useState<LocalServerData[]>([]);
     const [forceRender, setForceRender] = useState<number>(0);
@@ -88,6 +91,17 @@ export default function Page() {
         return 0;
     }
 
+    // Get Info
+    async function fetchInfoForHandle(handle: string, ircServerBase: string) {
+        if (allPublicData.has(handle))
+            return;
+
+        // console.debug(`Fetching Public Data for ${handle} on ${ircServerBase}...`);
+        const info = await findPublicDataForHandle(handle, ircServerBase);
+        console.debug(`Fetched Public Data for ${handle} on ${ircServerBase}:`, info);
+        allPublicData.set(handle, info);
+    }
+
     // Message handler that needs to be called indirectly (using Ref) to still have the currentState
     async function handleMessage(serverName: string, ws: WsServerManager, msg: string) {
         const genEv: WsGenericEv = JSON.parse(msg);
@@ -107,6 +121,9 @@ export default function Page() {
 
             // Lookup identity
             const lookup: IrcHandleLookupDto = await lookUpHandle(msgEv.senderHandle, ws.serverUrl);
+
+            // Fetch Data
+            await fetchInfoForHandle(msgEv.senderHandle, ws.serverUrl);
 
             // Validate
             const valid = await asymmVerifyObj(JSON.parse(msgEv.msgObj), msgEv.sig, parsePublicSplitKey(lookup.pubKey));
@@ -476,10 +493,12 @@ export default function Page() {
             return <></>;
 
         const onlineCount = currRoom.room.members == null ? 0 : currRoom.room.members!.filter((_, idx) => currRoom.room.memberStatus![idx].isOnline)?.length;
+        const onlineMembers: string[] = currRoom.room.members == null ? [] : currRoom.room.members!.filter((_, idx) => currRoom.room.memberStatus![idx].isOnline);
+        const offlineMembers: string[] = currRoom.room.members == null ? [] : currRoom.room.members!.filter((_, idx) => !currRoom.room.memberStatus![idx].isOnline);
 
         return <div>
             <p>{currRoom.room.description}</p>
-            <p><span title={currRoom.room.members?.join(", ")}>Members: {onlineCount}/{currRoom.room.memberCount}</span> (Limit: {currRoom.room.userLimit}), Created by: {currRoom.room.createdByHandle}</p>
+            <p><span title={`Online: ${onlineMembers.join(", ")}\nOffline: ${offlineMembers.join(", ")}`}>Members: {onlineCount}/{currRoom.room.memberCount}</span> (Limit: {currRoom.room.userLimit}), Created by: {currRoom.room.createdByHandle}</p>
         </div>
     }
 
@@ -497,16 +516,67 @@ export default function Page() {
     }
 
     function renderMessage(msg: LocalChatMessage) {
-        return (<li className={`${styles.MainChatEntry} ${msg.sigValid ? "" : styles.InvalidChatEntry}`} key={msg.uuid}><span title={msg.timestamp.toLocaleString()}>{msg.sigValid ? "" : "⚠ "}[{msg.timestamp.toLocaleTimeString()}] </span><b title={JSON.stringify(msg, null, 4)}>{msg.handle}:</b> {msg.msgObj.msg}</li>);
+        const timeStamp = <span title={JSON.stringify(msg, null, 4)}>{msg.sigValid ? "" : "⚠ "}[{msg.timestamp.toLocaleTimeString()}] </span>;
+        const pub = allPublicData.get(msg.handle) ?? null;
+        const pfpStuff = (pub == null || pub.pfpPath == null) ? <></> : <LazyMedia mediaPath={pub.pfpPath} roomServerUrl={pub.serverUrl} enforceSize={"1rem"}></LazyMedia>;
+        const handle = <b title={JSON.stringify(pub, null, 4)}>&nbsp;{msg.handle}: </b>;
+        const extra = msg.msgObj.filePaths.length == 0 ? <></> : (<div>{
+            msg.msgObj.filePaths.map((path, idx) => (<div key={idx}><LazyMedia mediaPath={path} roomServerUrl={currRoom?.server.serverUrl ?? ""} enforceSize={null}></LazyMedia></div>))
+        }</div>);
+        return (<li className={`${styles.MainChatEntry} ${msg.sigValid ? "" : styles.InvalidChatEntry}`} key={msg.uuid}>
+            {timeStamp}
+            {pfpStuff}
+            {handle}
+            {msg.msgObj.msg}
+            {extra}
+        </li>);
     }
 
     async function sendMessageToCurrentRoom() {
         if (currentMsgText.trim() == "" || currRoom == null)
             return;
 
-        // TODO: Add other stuff like signature, etc.
         const msg: ChatMessageDto = {
             msg: currentMsgText.trim(),
+            filePaths: []
+        }
+
+        // Sign msg obj
+        const keypair = await getKeypair();
+        const sig = await asymmSignObj(msg, keypair.priv);
+
+        await sendToServer(currRoom.server, new WsSendMsg(currRoom.room.name, JSON.stringify(msg), sig));
+
+        setCurrentMsgText("");
+    }
+
+    async function sendPasteMessage(e: ClipboardEvent) {
+        const files = e.clipboardData?.files;
+        if (files == null || files.length === 0)
+            return;
+        // console.debug("Files Pasted: ", files);
+        if (currRoom == null || !confirm(`Are you sure you want to upload \"${files[0].name}\" to the current room?\nIt will also send this text: ${currentMsgText.trim()}`))
+            return;
+
+        const filePaths: string[] = [];
+        for (const file of files) {
+            try {
+                const res = await uploadFisData(file);
+                if (res == null) {
+                    alert(`Failed to upload file ${file.name}.`);
+                    return;
+                }
+                filePaths.push(res);
+            } catch (e) {
+                alert(`Failed to upload file ${file.name}.\nError: ${(e as Error).message}`);
+                return;
+            }
+        }
+
+        // console.debug("Uploaded Files: ", filePaths);
+        const msg: ChatMessageDto = {
+            msg: currentMsgText.trim(),
+            filePaths
         }
 
         // Sign msg obj
@@ -521,6 +591,7 @@ export default function Page() {
     useGlobalState(true, false, "NONE", async () => {
         setAllMsgs(new Map());
         setAllUnreadMsgs(new Map());
+        setAllPublicData(new Map());
 
         await prepFisUtils();
 
@@ -540,6 +611,11 @@ export default function Page() {
 
                 <br/>
                 <p>Hello, {GlobalState.handle}! This is the Home Page.</p><br/>
+                <div>
+                    <button onClick={() => {uploadPfp().then()}}>Set PFP</button><span> &nbsp; </span>
+                    <button onClick={() => {setDescription().then()}}>Set Description</button>
+                </div>
+                <br/>
                 <div className={styles.PageButtons}>
                     <button onClick={logout}>Logout</button><br/>
                     {GlobalState.isAdmin ? <Link href="/admin/home">Admin</Link> : null}
@@ -599,7 +675,7 @@ export default function Page() {
                         {/*Stupid ass fix for some reason this works but using the disabled property directly doesn't*/}
                         {currRoom == null ? (<></>) : (<>
                             <p>{renderRoomTyping()}</p>
-                            <textarea value={currentMsgText} onChange={(e) => {
+                            <textarea value={currentMsgText} placeholder={"Enter a message or paste a file"} onChange={(e) => {
                                 setCurrentMsgText(e.target.value);
                                 if (e.target.value.trim() != "")
                                     updateMyTyping(true).then();
@@ -611,7 +687,7 @@ export default function Page() {
                                     e.preventDefault();
                                     return false;
                                 }
-                            }}></textarea>
+                            }} onPaste={sendPasteMessage as never}></textarea>
                             <button onClick={sendMessageToCurrentRoom}>Send</button>
                         </>)}
                     </div>

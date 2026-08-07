@@ -27,13 +27,12 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
   * Room Passwords
   * Member Management (Kick & Ban)
   * Update Room Data (Name, Description, Join Settings, Password, etc.)
-* Profile Settings **(TODO)**
+* Profile Settings
   * Set a custom PFP
-  * Have a little account Bio / Description
-  * Potentially have nicknames? (I might limit that to friends only)
+  * Have a little account Bio / Descriptiononly)
 * Live WebSocket Message Exchange
   * Verifiable Message Signatures
-  * Support for sending Media (Images, Videos, Files, etc.) **(TODO)**
+  * Support for sending Media (Images, Videos, Files, etc.)
   * Keep track of all Rooms while online & temporarily store Messages
   * Chat Room messages do not persist
   * Chat Room Messages are not encrypted!
@@ -51,7 +50,7 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
   * Support for connecting to multiple IRC Servers (as a Guest)
   * Option to allow Guests to participate in Rooms
   * Friend Requests & DMs can be sent cross IRC Servers **(TODO)**
-  * "Link" your IRC Server URL/Instance on your public FIS Entry **(TODO)**
+  * "Link" your IRC Server URL/Instance on your public FIS Entry
   * Self-hosted instances should automatically have working federation!
 * Easy to self-host and run locally
   * Run locally with just Java and NodeJS
@@ -76,7 +75,7 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
 
 
 ## Screenshots
-![screenshot](./img/example.png)
+![screenshot](./img/example2.png)
 (Yes I know the UI is meh right now, it's still majorly WIP)
 
 

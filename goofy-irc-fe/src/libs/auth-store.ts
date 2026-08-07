@@ -13,6 +13,7 @@ type StorageMode = "LOCAL_STORAGE" | "SESSION_STORAGE" | "NONE";
 let currentStorageMode: StorageMode;
 let currServerBase: string;
 let currKeypair: IdentityAsymmFullKeyPair | null;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let tempServerOverride: string | null;
 
 // TODO: Allow Securing your Service Frontend Client with a password too, (Encrypted Local Storage)
@@ -120,6 +121,14 @@ export async function saveKeypair(keypair: IdentityAsymmFullKeyPair | null) {
     await _storeKeypair(keypair, currentStorageMode);
 }
 
+// export async function getLSData(key: string): Promise<string | null> {
+//     await init();
+//     return await _getStore("_EXTRA_" + key, currentStorageMode);
+// }
+// export async function setLSData(key: string, value: string | null) {
+//     await init();
+//     await _setStore("_EXTRA_" + key, value, currentStorageMode);
+// }
 
 // Internal Storage Mode
 async function _loadStorageMode(): Promise<StorageMode> {
