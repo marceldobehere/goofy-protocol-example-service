@@ -54,6 +54,10 @@ export default function Component({mediaPath, roomServerUrl, enforceSize}: {medi
         if (ct.startsWith("audio/"))
             return (<audio src={src} controls />);
 
+        if (enforceSize != null) {
+            return <>[?]</>
+        }
+
         return (<a href={"#"} onClick={() => {
             downloadBinaryFile(data.blob as unknown as Uint8Array, data.details.filename);
         }}>File &quot;{data.details.filename}&quot;</a>);
