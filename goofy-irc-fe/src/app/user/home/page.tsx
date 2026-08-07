@@ -588,6 +588,13 @@ export default function Page() {
         setCurrentMsgText("");
     }
 
+    // Re-Fetch Data
+    async function refreshPublicData(handle: string) {
+        allPublicData.delete(handle);
+        await fetchInfoForHandle(handle, currRoom!.server.serverUrl!);
+        setForceRender(forceRender + 1);
+    }
+
     useGlobalState(true, false, "NONE", async () => {
         setAllMsgs(new Map());
         setAllUnreadMsgs(new Map());
@@ -612,7 +619,8 @@ export default function Page() {
                 <br/>
                 <p>Hello, {GlobalState.handle}! This is the Home Page.</p><br/>
                 <div>
-                    <button onClick={() => {uploadPfp().then()}}>Set PFP</button><span> &nbsp; </span>
+                    <button onClick={() => {uploadPfp(false).then(() => {refreshPublicData(GlobalState.handle!).then()})}}>Set PFP</button><span> &nbsp; </span>
+                    <button onClick={() => {uploadPfp(true).then(() => {refreshPublicData(GlobalState.handle!).then();})}}>Reset PFP</button><span> &nbsp; </span>
                     <button onClick={() => {setDescription().then()}}>Set Description</button>
                 </div>
                 <br/>

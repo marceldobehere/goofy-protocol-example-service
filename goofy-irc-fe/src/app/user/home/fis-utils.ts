@@ -20,6 +20,7 @@ import {
 import {getFixedAuth, getFixedAuthBytes, putFixedAuth} from "@/libs/req";
 import {deriveHandleFromPublicSplitKey} from "@/libs/crypto";
 import {IrcHandleLookupDto} from "@/libs/dtos";
+import {sleep} from "@/libs/utils";
 
 const SERVICE_NAME = "DEMO Goofy IRC";
 const PUBLIC_SERVICE_NAME = "Goofy IRC";
@@ -331,6 +332,25 @@ export async function setPublicFisData(newData: PublicGoofyIrcData) {
     const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
     const resUrl: string = await fisReq(currIdentity!.handleFull, putFixedAuth, `/fis-api/redirect/update-public-identity-entry/${identityHandle}`, updateDto, currIdentity);
     window.open(resUrl, "_blank")?.focus();
+
+    // Wait for update
+    const prom = new Promise((resolve) => {
+        console.debug("Waiting for Public FIS Data to be updated...");
+        const id = setInterval(async () => {
+            const data = await getPublicFisData();
+            if (JSON.stringify(data.services[PUBLIC_SERVICE_NAME]) == JSON.stringify(newData)) {
+                console.debug("Public FIS Data updated successfully");
+                clearInterval(id);
+                resolve(null);
+            }
+        }, 1000);
+        sleep(20_000).then(() => {
+            console.debug("Timeout while waiting for Public FIS Data to be updated");
+            clearInterval(id);
+            resolve(null);
+        })
+    });
+    await prom;
 }
 
 export async function uploadFisData(data: File): Promise<string | null> {
@@ -339,17 +359,24 @@ export async function uploadFisData(data: File): Promise<string | null> {
     return res == null ? null : `${identityHandle}@${serviceEntry?.uuid}@${res.fileUuid}`;
 }
 
-export async function uploadPfp()  {
-    const res = await uploadBucketEntry(currIdentity!, serviceEntry!.uuid);
-    if (res == null)
-        return;
+export async function uploadPfp(reset: boolean)  {
+    if (reset) {
+        const data = await getPublicFisData();
+        const service = data.services[PUBLIC_SERVICE_NAME];
+        service.pfpPath = undefined;
+        await setPublicFisData(service);
+    } else {
+        const res = await uploadBucketEntry(currIdentity!, serviceEntry!.uuid);
+        if (res == null)
+            return;
 
-    const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
+        const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
 
-    const data = await getPublicFisData();
-    const service = data.services[PUBLIC_SERVICE_NAME];
-    service.pfpPath = `${identityHandle}@${serviceEntry?.uuid}@${res.fileUuid}`;
-    await setPublicFisData(service);
+        const data = await getPublicFisData();
+        const service = data.services[PUBLIC_SERVICE_NAME];
+        service.pfpPath = `${identityHandle}@${serviceEntry?.uuid}@${res.fileUuid}`;
+        await setPublicFisData(service);
+    }
 }
 
 export async function setDescription() {
