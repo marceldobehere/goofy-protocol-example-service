@@ -13,11 +13,12 @@ public class WsGenericEv {
     private WsGenericEv.EventType evType;
 
     public enum EventType {
+        ERROR,
         SEND_MSG,
         RECEIVE_MSG,
         UPDATE_TYPING,
         UPDATE_ROOM_LIST,
         UPDATE_ROOM_DATA,
-        ERROR
+        UPDATE_IDENTITY
     }
 }

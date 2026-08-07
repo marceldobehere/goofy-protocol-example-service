@@ -116,7 +116,9 @@ public class MainWsHandler extends TextWebSocketHandler {
                     wsService.handleUpdateTypingEvent(auth, session, ev);
                 }
 
-                // TODO: Handle future messages, also need break?
+                case UPDATE_IDENTITY -> {
+                    wsService.handleUpdateIdentityEvent(auth);
+                }
 
                 default -> {
                     log.warn("Cannot handle EventType: {}", generic.getEvType());

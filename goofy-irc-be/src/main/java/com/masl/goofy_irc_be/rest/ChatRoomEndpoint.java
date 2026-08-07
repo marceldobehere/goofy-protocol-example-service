@@ -115,7 +115,7 @@ public class ChatRoomEndpoint {
             throw new RoomNotFound(roomName);
 
         // Check Created By
-        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()))
+        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()) && !auth.getAdmin())
             throw new RoomActionNotAllowed();
 
         chatRoomRepository.deleteByName(roomName);
@@ -134,7 +134,7 @@ public class ChatRoomEndpoint {
             throw new RoomNotFound(roomName);
 
         // Check If entity can view the room
-        if (!auth.getUser() && !room.getAllowGuests() && !room.getMembers().contains(auth.getHandle()))
+        if (!auth.getUser() && !room.getAllowGuests() && !room.getMembers().contains(auth.getHandle()) && !auth.getAdmin())
             throw new RoomNotFound(roomName);
 
         return fromChatRoom(room, auth.getHandle(), auth.getAdmin());
@@ -153,7 +153,7 @@ public class ChatRoomEndpoint {
             throw new RoomNotFound(roomName);
 
         // Check Created By
-        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()))
+        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()) && !auth.getAdmin())
             throw new RoomActionNotAllowed();
 
         // Validate Fields
@@ -209,7 +209,7 @@ public class ChatRoomEndpoint {
             throw new RoomNotFound(roomName);
 
         // Check allowJoin
-        if (!room.getAllowJoining())
+        if (!room.getAllowJoining() && !auth.getAdmin())
             throw new RoomJoiningNotAllowed();
 
         // Check if already a user
@@ -217,11 +217,11 @@ public class ChatRoomEndpoint {
             throw new RoomActionNotAllowed();
 
         // Check Banlist
-        if (room.getBannedUsers().contains(auth.getHandle()))
+        if (room.getBannedUsers().contains(auth.getHandle()) && !auth.getAdmin())
             throw new RoomMemberIsBanned();
 
         // Check potential Password
-        if (room.getRoomPasswordHash() != null) {
+        if (room.getRoomPasswordHash() != null && !auth.getAdmin()) {
             if (passwordHash == null || passwordHash.isBlank())
                 throw new RoomInvalidPasswordHash("Password is missing");
             if (!room.getRoomPasswordHash().equals(passwordHash))
@@ -283,7 +283,7 @@ public class ChatRoomEndpoint {
             throw new RoomNotFound(roomName);
 
         // Check Created By
-        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()))
+        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()) && !auth.getAdmin())
             throw new RoomActionNotAllowed();
 
         // Check if Member exists
@@ -312,7 +312,7 @@ public class ChatRoomEndpoint {
             throw new RoomNotFound(roomName);
 
         // Check Created By
-        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()))
+        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()) && !auth.getAdmin())
             throw new RoomActionNotAllowed();
 
         // Check if user bans themselves
@@ -346,7 +346,7 @@ public class ChatRoomEndpoint {
             throw new RoomNotFound(roomName);
 
         // Check Created By
-        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()))
+        if (!auth.getHandle().equals(room.getCreatedBy().getHandle()) && !auth.getAdmin())
             throw new RoomActionNotAllowed();
 
         // Check Banlist

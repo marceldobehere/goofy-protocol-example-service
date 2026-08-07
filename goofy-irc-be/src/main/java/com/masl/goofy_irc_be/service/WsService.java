@@ -108,8 +108,18 @@ public class WsService {
         trySendMessage(handle, mapper.writeValueAsString(ev));
     }
 
-    public void trySendMessages(WsGenericEv ev, ChatRoom room) {
+    public void trySendMessagesRoom(WsGenericEv ev, ChatRoom room) {
         trySendMessages(ev, room.getMembers(), room.getCreatedBy().getHandle());
+    }
+
+    public void trySendMessagesRooms(WsGenericEv ev, List<ChatRoom> rooms) {
+        Set<String> handles = new HashSet<>();
+        for (var room : rooms) {
+            handles.addAll(room.getMembers());
+            handles.add(room.getCreatedBy().getHandle());
+        }
+
+        trySendMessages(ev, handles);
     }
 
     public void trySendMessages(WsGenericEv ev, Set<String> _handles, String ... extraHandles) {
@@ -165,13 +175,13 @@ public class WsService {
         msg.setRoomName(room.getName());
         msg.setMsgObj(ev.getMsgObj());
         msg.setSig(ev.getSig());
-        trySendMessages(msg, room);
+        trySendMessagesRoom(msg, room);
     }
 
     // TODO: Rate Limit
     @Transactional
     public void handleUpdateTypingEvent(GoofyAuthUser auth, WebSocketSession session, WsUpdateTyping ev) {
-        log.debug("Handling Update Typing Event from {}: {}", auth.getHandle(), ev);
+        // log.debug("Handling Update Typing Event from {}: {}", auth.getHandle(), ev);
 
         // Update Status
         MemberStatus status = getStatus(auth.getHandle(), session);
@@ -188,26 +198,38 @@ public class WsService {
 
         // TODO: Don't send full update room and rather a specified update state message, to not DoS my server every update xd
 
+        // yes I know it's a bit inefficient but for this demo it's not that important
+
         // Tell ppl from old room to update
         if (oldRoom != null) {
             ChatRoom room = chatRoomRepository.findByName(oldRoom);
             if (room != null)
-                trySendMessages(new WsUpdateRoomData(room.getName()), room);
+                trySendMessagesRoom(new WsUpdateRoomData(room.getName()), room);
         }
 
         // Tell ppl in new room to update
         if (status.typingInRoom != null) {
             ChatRoom room = chatRoomRepository.findByName(status.typingInRoom);
             if (room != null)
-                trySendMessages(new WsUpdateRoomData(room.getName()), room);
+                trySendMessagesRoom(new WsUpdateRoomData(room.getName()), room);
         }
+    }
+
+    // TODO: Rate Limit
+    @Transactional
+    public void handleUpdateIdentityEvent(GoofyAuthUser auth) {
+        List<ChatRoom> rooms = chatRoomRepository.findAllByCreatedBy_Handle_OrMembersContaining(auth.getHandle(), auth.getHandle());
+        trySendMessagesRooms(new WsUpdateIdentity(auth.getHandle()), rooms);
     }
 
     @Transactional
     public void handleOnlineStatusChange(GoofyAuthUser auth) {
+        // yes I know it's a bit inefficient but for this demo it's not that important
+        // I could send one message with all rooms but that'd leak data about what rooms a person is in and also needs me to change lots of stuff
+        // I could also generate a specific message for each handle but I cant be asked
         List<ChatRoom> rooms = chatRoomRepository.findAllByCreatedBy_Handle_OrMembersContaining(auth.getHandle(), auth.getHandle());
         for (var room : rooms)
-            trySendMessages(new WsUpdateRoomData(room.getName()), room);
+            trySendMessagesRoom(new WsUpdateRoomData(room.getName()), room);
     }
 
     // Helper Stuff
