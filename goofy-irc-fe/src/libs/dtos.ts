@@ -150,12 +150,13 @@ export class WsGenericEv {
 }
 
 export type WsGenericEvEventType =
+    | "ERROR"
     | "SEND_MSG"
     | "RECEIVE_MSG"
     | "UPDATE_TYPING"
     | "UPDATE_ROOM_LIST"
     | "UPDATE_ROOM_DATA"
-    | "ERROR";
+    | "UPDATE_IDENTITY";
 
 export class WsError extends WsGenericEv {
     errorMsg: string;
@@ -223,6 +224,15 @@ export class WsUpdateTyping extends WsGenericEv {
     }
 }
 
+export class WsUpdateIdentity extends WsGenericEv {
+    handle: string;
+
+    constructor(handle: string) {
+        super("UPDATE_IDENTITY");
+        this.handle = handle;
+    }
+}
+
 export interface LocalServerData {
     serverUrl: string;
     serverName: string;
@@ -244,6 +254,7 @@ export interface LocalChatMessage {
     uuid: string;
     sig: string;
     sigValid: boolean;
+    isRealMessage: boolean;
 }
 
 

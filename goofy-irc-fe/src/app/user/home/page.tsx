@@ -15,7 +15,7 @@ import {
     LocalServerData,
     WsGenericEv,
     WsReceiveMsg,
-    WsSendMsg,
+    WsSendMsg, WsUpdateIdentity,
     WsUpdateRoomData,
     WsUpdateTyping
 } from "@/libs/dtos";
@@ -24,12 +24,12 @@ import {deleteAuth, getAuth, postAuth, putAuth} from "@/libs/req";
 import {asymmSignObj, asymmVerifyObj, parsePublicSplitKey, sha256ToText} from "@/libs/crypto";
 import {
     addStoredIrcServer,
-    addStoredIrcServerIfDoesntExist, deleteStoredIrcServer, findPublicDataForHandle,
+    addStoredIrcServerIfDoesntExist, compStrArrays, deleteStoredIrcServer, findPublicDataForHandle,
     getStoredIrcServerList,
     prepFisUtils, setDescription, uploadFisData, uploadPfp
 } from "@/app/user/home/fis-utils";
-import LazyMedia from "@/app/components/lazy-media/component";
 import {PublicGoofyIrcData} from "@/libs/service-dtos";
+import {renderMessage, renderRoomDetails, renderRoomEntry, renderRoomTyping} from "@/app/user/home/render-utils";
 
 export default function Page() {
     const [currentMsgText, setCurrentMsgText] = useState<string>("");
@@ -138,7 +138,8 @@ export default function Page() {
                 // eslint-disable-next-line react-hooks/purity
                 timestamp: new Date(Date.now()),
                 sig: msgEv.sig,
-                sigValid: valid
+                sigValid: valid,
+                isRealMessage: true
             };
 
             const msgs = getOrCreateMsgListForRoom(msgEv.roomName, ws.serverUrl);
@@ -152,10 +153,40 @@ export default function Page() {
             else
                 unreadCountForRoom(msgEv.roomName, ws.serverUrl, "INC");
             setForceRender(forceRender + 1);
+        } else if (genEv.evType == "UPDATE_IDENTITY") {
+            const handle = (genEv as WsUpdateIdentity).handle;
+            await refreshPublicData(handle, ws.serverUrl);
         }
     }
     // eslint-disable-next-line react-hooks/refs
     msgHandler.current = handleMessage;
+
+    async function createSystemMessage(msg: string, roomName: string, serverUrl: string) {
+        await createFakeMessage({msg, filePaths: []}, roomName, serverUrl);
+    }
+
+    async function createFakeMessage(msgObj: ChatMessageDto, roomName: string, serverUrl: string) {
+        // Create Obj
+        const msg: LocalChatMessage = {
+            msgObj,
+            handle: "[SYSTEM]",
+            uuid: crypto.randomUUID(),
+            // eslint-disable-next-line react-hooks/purity
+            timestamp: new Date(Date.now()),
+            sig: "",
+            sigValid: true,
+            isRealMessage: false
+        };
+
+        const msgs = getOrCreateMsgListForRoom(roomName, serverUrl);
+        msgs.push(msg);
+        if (msgs == currMsgs) {
+            setTimeout(() => {
+                chatUl.current?.scrollTo({top: chatUl.current.scrollHeight, behavior: "smooth"});
+            }, 150);
+        }
+        setForceRender(forceRender + 1);
+    }
 
     async function sendToServer(server: LocalServerData | null, msg: WsGenericEv) {
         if (server == null)
@@ -164,9 +195,9 @@ export default function Page() {
         await server.ws.sendRawWsMessage(JSON.stringify(msg));
     }
 
-    // async function sendToAllServers(msg: WsGenericEv) {
-    //     await Promise.all(serverList.map((s => sendToServer(s, msg))));
-    // }
+    async function sendToAllServers(msg: WsGenericEv) {
+        await Promise.all(serverList.map((s => sendToServer(s, msg))));
+    }
 
     // TODO: Add max timeout if the same text is standing there for 1000 years
     // Typing handler that needs to be called indirectly (using Ref) to still have the currentState
@@ -240,7 +271,7 @@ export default function Page() {
         if (servers.length == 0) {
             setMyRoomList([]);
             setAvailableRoomList([]);
-            await setAndLoadCurrentRoom(null);
+            await setAndLoadCurrentRoom(null, true);
             return;
         }
 
@@ -289,7 +320,7 @@ export default function Page() {
         if (currRoom != null) {
             const found = _allRooms.find((r) => currRoom.room.name == r.room.name && currRoom.server.serverUrl == r.server.serverUrl);
             if (found == null || found.room.members == null || !found.room.members.includes(GlobalState.handle!))
-                await setAndLoadCurrentRoom(null);
+                await setAndLoadCurrentRoom(null, true);
         }
 
         // TODO: Delete message cache for deleted rooms
@@ -346,7 +377,7 @@ export default function Page() {
             await deleteAuth(room.server.serverUrl + `/api/chatroom/room/${room.room.name}/delete`);
             alert("Deleted Room!");
             await loadRoomListData();
-            await setAndLoadCurrentRoom(null);
+            await setAndLoadCurrentRoom(null, true);
         } catch (err) {
             console.error(err);
             alert("Failed to create room: " + (err as Error).message);
@@ -444,92 +475,85 @@ export default function Page() {
     async function refreshRoom(roomName: string | null, roomServer: string) {
         if (roomName == null || currRoom == null)
             return;
-        if (roomName != currRoom.room.name || roomServer != currRoom.server.serverUrl)
-            return;
-        await setAndLoadCurrentRoom(currRoom);
+
+        const foundRoom = myRoomList.find((r) => (roomName == r.room.name && roomServer == r.server.serverUrl));
+        await setAndLoadCurrentRoom(foundRoom ?? currRoom, (roomName == currRoom.room.name && roomServer == currRoom.server.serverUrl));
     }
 
-    async function setAndLoadCurrentRoom(_room: LocalRoomData | null) {
+    async function setAndLoadCurrentRoom(_room: LocalRoomData | null, doSet: boolean) {
         if (_room == null) {
-            setCurrMsgs([]);
-            setCurrRoom(null);
+            if (doSet) {
+                setCurrMsgs([]);
+                setCurrRoom(null);
+            }
             return;
         }
 
         try {
             const roomDto = await getAuth<ChatRoomDto>(_room.server.serverUrl + `/api/chatroom/room/${_room.room.name}`);
+            const newRoom = {room: roomDto, server: _room.server, sameRoomNameInDiffServer: _room.sameRoomNameInDiffServer};
 
-            unreadCountForRoom(roomDto.name, _room.server.serverUrl, "RESET");
-            setCurrMsgs(getOrCreateMsgListForRoom(roomDto.name, _room.server.serverUrl));
-            setCurrRoom({room: roomDto, server: _room.server, sameRoomNameInDiffServer: _room.sameRoomNameInDiffServer});
+            if (doSet) {
+                unreadCountForRoom(roomDto.name, _room.server.serverUrl, "RESET");
+                setCurrMsgs(getOrCreateMsgListForRoom(roomDto.name, _room.server.serverUrl));
+                setCurrRoom(newRoom);
+                setTimeout(() => {
+                    chatUl.current?.scrollTo({top: chatUl.current.scrollHeight, behavior: "smooth"});
+                }, 150);
+            }
+
+            // Compare Members
+            if (_room.room.members != null && roomDto.members != null) {
+                // Compare Members
+                const memberComp = compStrArrays(_room.room.members, roomDto.members);
+                if (!memberComp.identical) {
+                    for (const member of memberComp.removedValues)
+                        await createSystemMessage(`${member} left the room.`, _room.room.name, _room.server.serverUrl);
+                    for (const member of memberComp.addedValues)
+                        await createSystemMessage(`${member} joined the room.`, _room.room.name, _room.server.serverUrl);
+                }
+
+                // Compare Online Members
+                const onlineComp = compStrArrays(
+                    _room.room.members!.filter((_, idx) => _room.room.memberStatus![idx].isOnline),
+                    roomDto.members!.filter((_, idx) => roomDto.memberStatus![idx].isOnline)
+                );
+
+                // Remove Compared Members
+                onlineComp.addedValues = onlineComp.addedValues.filter((v) => !memberComp.addedValues.includes(v));
+                onlineComp.removedValues = onlineComp.removedValues.filter((v) => !memberComp.removedValues.includes(v));
+
+
+                if (!onlineComp.identical) {
+                    for (const member of onlineComp.removedValues)
+                        await createSystemMessage(`${member} disconnected.`, _room.room.name, _room.server.serverUrl);
+                    for (const member of onlineComp.addedValues)
+                        await createSystemMessage(`${member} connected.`, _room.room.name, _room.server.serverUrl);
+                }
+
+                // Other Room updates
+                if (_room.room.description != roomDto.description ||
+                    _room.room.userLimit != roomDto.userLimit ||
+                    _room.room.allowJoining != roomDto.allowJoining ||
+                    _room.room.allowGuests != roomDto.allowGuests)
+                    await createSystemMessage(`Room details were updated.`, _room.room.name, _room.server.serverUrl);
+
+
+                // console.debug("COMPARED: ", _room.room, roomDto, memberComp, onlineComp);
+            }
+
+            const idx = myRoomList.findIndex((r) => (newRoom.room.name == r.room.name && newRoom.server.serverUrl == r.server.serverUrl));
+            if (idx != -1) {
+                const tList = [...myRoomList];
+                tList[idx] = newRoom;
+                setMyRoomList(tList);
+                // eslint-disable-next-line react-hooks/immutability
+                myRoomList[idx] = newRoom;
+            }
         } catch (err) {
             console.error(err);
             alert("Failed to get room data: " + (err as Error).message);
         }
-    }
-
-    function canJoinRoom(room: LocalRoomData) {
-        return room.room.allowJoining; // TODO: Check for guest behaviour! (allowGuest join if we are guests)
-    }
-
-    function isMemberOfRoom(room: LocalRoomData, rooms: LocalRoomData[] = myRoomList): boolean {
-        return rooms.find((r) => r.room.name == room.room.name && r.server.serverUrl == room.server.serverUrl) != null;
-    }
-
-    function renderRoomEntry(room: LocalRoomData) {
-        const key = `${room.room.name}_${room.server.serverUrl}`;
-        const text = (room.sameRoomNameInDiffServer) ? `${room.room.name} (${room.server.serverName})` : room.room.name;
-        const isMember = isMemberOfRoom(room);
-        const canJoin = canJoinRoom(room);
-        const extra = isMember ? <button onClick={() => {setAndLoadCurrentRoom(room).then()}}>View</button> : ( canJoin ? <button onClick={() => {joinRoom(room).then()}}>Join</button> : <></>);
-        const isCurrRoom = currRoom?.server.serverUrl == room.server.serverUrl && currRoom?.room.name == room.room.name;
-        const unread = unreadCountForRoom(room.room.name, room.server.serverUrl);
-
-        return (<li key={key} title={JSON.stringify(room.room, null, 4)}>{isCurrRoom ? <b>{text}</b> : text} {unread == 0 ? "" : `(${unread})`} {extra}</li>);
-    }
-
-    function renderRoomDetails() {
-        if (currRoom == null)
-            return <></>;
-
-        const onlineCount = currRoom.room.members == null ? 0 : currRoom.room.members!.filter((_, idx) => currRoom.room.memberStatus![idx].isOnline)?.length;
-        const onlineMembers: string[] = currRoom.room.members == null ? [] : currRoom.room.members!.filter((_, idx) => currRoom.room.memberStatus![idx].isOnline);
-        const offlineMembers: string[] = currRoom.room.members == null ? [] : currRoom.room.members!.filter((_, idx) => !currRoom.room.memberStatus![idx].isOnline);
-
-        return <div>
-            <p>{currRoom.room.description}</p>
-            <p><span title={`Online: ${onlineMembers.join(", ")}\nOffline: ${offlineMembers.join(", ")}`}>Members: {onlineCount}/{currRoom.room.memberCount}</span> (Limit: {currRoom.room.userLimit}), Created by: {currRoom.room.createdByHandle}</p>
-        </div>
-    }
-
-    function renderRoomTyping() {
-        if (currRoom == null || currRoom.room.members == null || currRoom.room.memberStatus == null)
-            return <></>;
-
-        const typingPpl = currRoom.room.memberStatus
-            .filter((stat, idx) => stat.typingInRoom != null && currRoom.room.members![idx] != GlobalState.handle)
-            .map((_, idx) => currRoom.room.members![idx]);
-        if (typingPpl.length == 0)
-            return <></>;
-
-        return (<>{typingPpl.join(", ")} {typingPpl.length == 1 ? "is" : "are"} typing...</>);
-    }
-
-    function renderMessage(msg: LocalChatMessage) {
-        const timeStamp = <span title={JSON.stringify(msg, null, 4)}>{msg.sigValid ? "" : "⚠ "}[{msg.timestamp.toLocaleTimeString()}] </span>;
-        const pub = allPublicData.get(msg.handle) ?? null;
-        const pfpStuff = (pub == null || pub.pfpPath == null) ? <></> : <LazyMedia mediaPath={pub.pfpPath} roomServerUrl={pub.serverUrl} enforceSize={"1rem"}></LazyMedia>;
-        const handle = <b title={JSON.stringify(pub, null, 4)}>&nbsp;{msg.handle}: </b>;
-        const extra = msg.msgObj.filePaths.length == 0 ? <></> : (<div>{
-            msg.msgObj.filePaths.map((path, idx) => (<div key={idx}><LazyMedia mediaPath={path} roomServerUrl={currRoom?.server.serverUrl ?? ""} enforceSize={null}></LazyMedia></div>))
-        }</div>);
-        return (<li className={`${styles.MainChatEntry} ${msg.sigValid ? "" : styles.InvalidChatEntry}`} key={msg.uuid}>
-            {timeStamp}
-            {pfpStuff}
-            {handle}
-            {msg.msgObj.msg}
-            {extra}
-        </li>);
     }
 
     async function sendMessageToCurrentRoom() {
@@ -589,10 +613,24 @@ export default function Page() {
     }
 
     // Re-Fetch Data
-    async function refreshPublicData(handle: string) {
+    async function refreshPublicData(handle: string, serverUrl: string) {
+        console.log("Refreshing data for: ", handle, " with server: ", serverUrl);
         allPublicData.delete(handle);
-        await fetchInfoForHandle(handle, currRoom!.server.serverUrl!);
+        await fetchInfoForHandle(handle, serverUrl);
         setForceRender(forceRender + 1);
+    }
+
+    async function sendPublicDataUpdate() {
+        if (GlobalState.handle == null)
+            return;
+
+        // Send Update
+        await sendToAllServers(new WsUpdateIdentity(GlobalState.handle));
+    }
+
+    function roomEntryHelper(r: LocalRoomData) {
+        return renderRoomEntry(r, myRoomList, currRoom, unreadCountForRoom(r.room.name, r.server.serverUrl),
+            () => {setAndLoadCurrentRoom(r, true).then();}, () => {joinRoom(r).then();});
     }
 
     useGlobalState(true, false, "NONE", async () => {
@@ -619,9 +657,9 @@ export default function Page() {
                 <br/>
                 <p>Hello, {GlobalState.handle}! This is the Home Page.</p><br/>
                 <div>
-                    <button onClick={() => {uploadPfp(false).then(() => {refreshPublicData(GlobalState.handle!).then()})}}>Set PFP</button><span> &nbsp; </span>
-                    <button onClick={() => {uploadPfp(true).then(() => {refreshPublicData(GlobalState.handle!).then();})}}>Reset PFP</button><span> &nbsp; </span>
-                    <button onClick={() => {setDescription().then()}}>Set Description</button>
+                    <button onClick={() => {uploadPfp(false).then(sendPublicDataUpdate)}}>Set PFP</button><span> &nbsp; </span>
+                    <button onClick={() => {uploadPfp(true).then(sendPublicDataUpdate)}}>Reset PFP</button><span> &nbsp; </span>
+                    <button onClick={() => {setDescription().then(sendPublicDataUpdate)}}>Set Description</button>
                 </div>
                 <br/>
                 <div className={styles.PageButtons}>
@@ -648,13 +686,15 @@ export default function Page() {
                         {/*<hr/>*/}
                         <div className={styles.MainSidebarListBlock}>
                             <h3>My Rooms</h3>
-                            <ul>{myRoomList.map((r) => renderRoomEntry(r))}</ul>
+                            {/* eslint-disable-next-line react-hooks/refs */}
+                            <ul>{myRoomList.map((r) => roomEntryHelper(r))}</ul>
                             <button onClick={() => {createRoom().then()}}>Create Room</button>
                         </div>
                         <hr/>
                         <div className={styles.MainSidebarListBlock}>
                             <h3>All Rooms</h3>
-                            <ul>{availableRoomList.map((r) => renderRoomEntry(r))}</ul>
+                            {/* eslint-disable-next-line react-hooks/refs */}
+                            <ul>{availableRoomList.map((r) => roomEntryHelper(r))}</ul>
                         </div>
                     </div>
 
@@ -662,19 +702,24 @@ export default function Page() {
                         {currRoom == null ? (<></>) : (<>
                             <div className={styles.MainChatRoomStats}>
                                 <h3>{currRoom?.room.name ?? ""}</h3>
-                                {renderRoomDetails()}
-                                {currRoom.room.createdByHandle == GlobalState.handle ? (<>
+                                {renderRoomDetails(currRoom)}
+
+                                {(currRoom.room.createdByHandle != GlobalState.handle) ? (<>
+                                    <button onClick={() => {leaveRoom(currRoom).then()}}>Leave Room</button>
+                                    <span> &nbsp; </span>
+                                </>) : (<></>)}
+
+                                {(currRoom.room.createdByHandle == GlobalState.handle || GlobalState.isAdmin) ? (<>
                                     <button>Kick Member</button>
                                     <button>Ban Member</button>
                                     <button>Unban Member</button>
                                     <button onClick={() => {updateRoom(currRoom).then()}}>Update Room Data</button>
                                     <button onClick={() => {deleteRoom(currRoom).then()}}>Delete Room</button>
-                                </>) : (<>
-                                    <button onClick={() => {leaveRoom(currRoom).then()}}>Leave Room</button>
-                                </>)}
+                                    <span> &nbsp; </span>
+                                </>) : (<></>)}
                             </div>
                             <ul ref={chatUl} className={styles.MainChatList}>
-                                {currMsgs.map((r) => renderMessage(r))}
+                                {currMsgs.map((r) => renderMessage(r, currRoom, allPublicData))}
                             </ul>
                         </>)}
                     </div>
@@ -682,7 +727,7 @@ export default function Page() {
                     <div className={styles.MainChatInput}>
                         {/*Stupid ass fix for some reason this works but using the disabled property directly doesn't*/}
                         {currRoom == null ? (<></>) : (<>
-                            <p>{renderRoomTyping()}</p>
+                            <p>{renderRoomTyping(currRoom)}</p>
                             <textarea value={currentMsgText} placeholder={"Enter a message or paste a file"} onChange={(e) => {
                                 setCurrentMsgText(e.target.value);
                                 if (e.target.value.trim() != "")

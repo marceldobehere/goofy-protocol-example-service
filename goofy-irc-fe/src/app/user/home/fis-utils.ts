@@ -136,6 +136,13 @@ let tableFriendRequests: ServiceTableEntryDto | null = null;
 let tableDms: ServiceTableEntryDto | null = null;
 let tableReceivedDms: ServiceTableEntryDto | null = null;
 
+export async function prepIfNeeded() {
+    if (serviceEntry == null || currIdentity == null || tableServerList == null) {
+        console.debug("For some reason the data got exploded, doing init again");
+        await prepFisUtils();
+    }
+}
+
 export async function prepFisUtils() {
     console.debug("FIS Utils init");
 
@@ -240,11 +247,11 @@ async function prepareTable(identity: IdentityAsymmFullKeyPair, serviceUuid: str
             maybeEntry.columns = baseTable.columns;
             updated = true;
         }
-        if (!compArrays(maybeEntry.handlesWithReadPerms!, baseTable.handlesWithReadPerms!)) {
+        if (!compStrArrays(maybeEntry.handlesWithReadPerms!, baseTable.handlesWithReadPerms!).identical) {
             maybeEntry.handlesWithReadPerms = baseTable.handlesWithReadPerms;
             updated = true;
         }
-        if (!compArrays(maybeEntry.handlesWithWritePerms!, baseTable.handlesWithWritePerms!)) {
+        if (!compStrArrays(maybeEntry.handlesWithWritePerms!, baseTable.handlesWithWritePerms!).identical) {
             maybeEntry.handlesWithWritePerms = baseTable.handlesWithWritePerms;
             updated = true;
         }
@@ -265,6 +272,7 @@ export interface StoredServerEntry {
 }
 
 export async function getStoredIrcServerList(): Promise<StoredServerEntry[]> {
+    await prepIfNeeded();
     const query: TableSelectDto = {
         colNames: ["server_url", "server_name"]
     };
@@ -282,6 +290,7 @@ export async function getStoredIrcServerList(): Promise<StoredServerEntry[]> {
 }
 
 export async function addStoredIrcServer(entry: StoredServerEntry) {
+    await prepIfNeeded();
     const insertObj = {
       "server_url": entry.serverUrl,
       "server_name": entry.serverName
@@ -291,6 +300,7 @@ export async function addStoredIrcServer(entry: StoredServerEntry) {
 }
 
 export async function addStoredIrcServerIfDoesntExist(entry: StoredServerEntry) {
+    await prepIfNeeded();
     const vals = await getStoredIrcServerList();
     if (vals.find(v => v.serverUrl === entry.serverUrl) != null)
         return;
@@ -299,6 +309,7 @@ export async function addStoredIrcServerIfDoesntExist(entry: StoredServerEntry) 
 }
 
 export async function deleteStoredIrcServer(serverUrl: string) {
+    await prepIfNeeded();
     const deleteQuery: TableBasicQueryDto = {
         where: {
             type: "C_EQ",
@@ -313,11 +324,13 @@ export async function deleteStoredIrcServer(serverUrl: string) {
 }
 
 export async function getPublicFisData(): Promise<IdentityPublicData> {
+    await prepIfNeeded();
     const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
     return await fisReq(currIdentity!.handleFull, getFixedAuth, `/fis-api/identity-storage/public/${identityHandle}`, currIdentity);
 }
 
 export async function setPublicFisData(newData: PublicGoofyIrcData) {
+    await prepIfNeeded();
     const updateDto: ServicePublicDataUpdate = {
         serverName: PUBLIC_SERVICE_NAME,
         newData
@@ -344,7 +357,7 @@ export async function setPublicFisData(newData: PublicGoofyIrcData) {
                 resolve(null);
             }
         }, 1000);
-        sleep(20_000).then(() => {
+        sleep(30_000).then(() => {
             console.debug("Timeout while waiting for Public FIS Data to be updated");
             clearInterval(id);
             resolve(null);
@@ -354,12 +367,14 @@ export async function setPublicFisData(newData: PublicGoofyIrcData) {
 }
 
 export async function uploadFisData(data: File): Promise<string | null> {
+    await prepIfNeeded();
     const res = await uploadBucketEntry(currIdentity!, serviceEntry!.uuid, ["*"], data);
     const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
     return res == null ? null : `${identityHandle}@${serviceEntry?.uuid}@${res.fileUuid}`;
 }
 
 export async function uploadPfp(reset: boolean)  {
+    await prepIfNeeded();
     if (reset) {
         const data = await getPublicFisData();
         const service = data.services[PUBLIC_SERVICE_NAME];
@@ -380,6 +395,7 @@ export async function uploadPfp(reset: boolean)  {
 }
 
 export async function setDescription() {
+    await prepIfNeeded();
     const desc = prompt("Enter a new description for your profile");
     if (desc == null)
         return;
@@ -391,6 +407,7 @@ export async function setDescription() {
 }
 
 export async function findPublicDataForHandle(handle: string, ircServerBase: string): Promise<PublicGoofyIrcData | null> {
+    await prepIfNeeded();
     try {
         const lookup: IrcHandleLookupDto = await lookUpHandle(handle, ircServerBase);
         const data: IdentityPublicData = await fisReq(`${lookup.handle}@${lookup.handleDomain}`, getFixedAuth, `/fis-api/identity-storage/public/${handle}`, currIdentity);
@@ -408,6 +425,7 @@ export interface BucketData {
 }
 
 export async function getFisBucketData(mediaPath: string, roomServerUrl: string, maxSize: number = 10_000_000): Promise<BucketData> {
+    await prepIfNeeded();
     const parts = mediaPath.split("@");
 
     const lookup: IrcHandleLookupDto = await lookUpHandle(parts[0], roomServerUrl);
@@ -430,21 +448,21 @@ export async function getFisBucketData(mediaPath: string, roomServerUrl: string,
     }
 }
 
+export function compStrArrays(oldArr: string[], newArr: string[]): { identical: boolean; addedValues: string[]; removedValues: string[] } {
+    const oldSet = new Set(oldArr);
+    const newSet = new Set(newArr);
 
-const compArrays = (arr1: unknown[], arr2: unknown[]): boolean => {
-    // Early exit: Different lengths
-    if (arr1.length !== arr2.length) return false;
+    const addedValues: string[] = [];
+    for (const v of newSet)
+        if (!oldSet.has(v))
+            addedValues.push(v);
 
-    // Sort arrays by stringifying elements (with sorted keys)
-    const sortFn = (a: unknown, b: unknown) => {
-        const strA = JSON.stringify(a, Object.keys(a as object).sort());
-        const strB = JSON.stringify(b, Object.keys(b as object).sort());
-        return strA.localeCompare(strB);
-    };
+    const removedValues: string[] = [];
+    for (const v of oldSet)
+        if (!newSet.has(v))
+            removedValues.push(v);
 
-    const sortedArr1 = [...arr1].sort(sortFn);
-    const sortedArr2 = [...arr2].sort(sortFn);
 
-    // Compare sorted arrays
-    return JSON.stringify(sortedArr1) === JSON.stringify(sortedArr2);
-};
+    const identical = addedValues.length === 0 && removedValues.length === 0;
+    return { identical, addedValues, removedValues };
+}
