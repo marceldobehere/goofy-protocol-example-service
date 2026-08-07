@@ -53,7 +53,7 @@ public class User {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'ALLOW_ANY_ROOM_MEMBER'")
-    private FriendRequestSetting friendRequestSetting;
+    private FriendRequestSetting friendRequestSetting = FriendRequestSetting.ALLOW_ANY_ROOM_MEMBER;
 
     @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)
     private Set<ChatRoom> createdChatRooms;
