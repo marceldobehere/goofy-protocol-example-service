@@ -51,12 +51,12 @@ export default function Component({mediaPath, roomServerUrl, enforceSize}: {medi
         if (ct.startsWith("video/"))
             return (<video src={src} style={style} muted controls/>);
 
-        if (ct.startsWith("audio/"))
-            return (<audio src={src} controls />);
-
         if (enforceSize != null) {
             return <>[?]</>
         }
+
+        if (ct.startsWith("audio/"))
+            return (<audio src={src} controls />);
 
         return (<a href={"#"} onClick={() => {
             downloadBinaryFile(data.blob as unknown as Uint8Array, data.details.filename);
