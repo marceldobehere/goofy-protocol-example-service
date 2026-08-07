@@ -106,6 +106,7 @@ public class HandleHelper implements HandleCryptoHelper {
         log.debug("Attempting to look up handle {} at domain {}", strippedHandle, optDomain);
         for (var protocol : supportedFisProtocols) {
             try {
+                // TODO: Disable local IP Addresses / Domains / localhost if not in dev mode
                 HandleLookupDto lookupDto = restClient.get()
                         .uri(protocol + optDomain + "/fis-api/user/lookup/" + strippedHandle)
                         .retrieve()

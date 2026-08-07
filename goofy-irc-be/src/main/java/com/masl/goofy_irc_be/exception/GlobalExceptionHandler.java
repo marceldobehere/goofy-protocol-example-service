@@ -11,6 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -51,6 +52,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException ex) {
         return ResponseEntity
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(ex.getMessage());
+    }
+
+    // Handling MissingServletRequestParameterException
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<String> handleMissingServletRequestParameterException(MissingServletRequestParameterException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
                 .contentType(MediaType.TEXT_PLAIN)
                 .body(ex.getMessage());
     }

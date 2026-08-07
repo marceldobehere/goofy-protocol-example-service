@@ -12,6 +12,7 @@ import jakarta.validation.Validator;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.properties.ConfigurationPropertiesBindException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.socket.CloseStatus;
@@ -65,7 +66,7 @@ public class MainWsHandler extends TextWebSocketHandler {
         log.debug("[Close] Remaining Sessions total: {}, user: {}", wsService.getEntryCount(), wsService.getEntryCount(auth.getHandle()));
         try {
             wsService.handleOnlineStatusChange(auth);
-        } catch (CannotCreateTransactionException e) {
+        } catch (CannotCreateTransactionException | ConfigurationPropertiesBindException e) {
             // Ignore
         }
     }

@@ -3,7 +3,7 @@ package com.masl.goofy_irc_be.rest;
 import com.masl.goofy_irc_be.auth.GoofyAuthUser;
 import com.masl.goofy_irc_be.config.ROLES;
 import com.masl.goofy_irc_be.dto.response.IrcHandleLookupDto;
-import com.masl.goofy_irc_be.dto.response.MyUserInfoDto;
+import com.masl.goofy_irc_be.dto.both.MyUserInfoDto;
 import com.masl.goofy_irc_be.entity.CachedKeyHandleEntry;
 import com.masl.goofy_irc_be.entity.User;
 import com.masl.goofy_irc_be.exception.base.swagger.IrcEndpoint;
@@ -43,7 +43,7 @@ public class UserEndpoint {
     @IrcEndpoint(summary = "Gets Information for the current User", description = "This Endpoint returns information about the current user/identity, including their handle, public key, and authentication role.")
     public MyUserInfoDto myInfo(@AuthenticationPrincipal GoofyAuthUser auth) {
         User user = userRepository.findByHandle(auth.getHandle());
-        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath(), user.getFriendListTablePath());
+        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath(), user.getFriendListTablePath(), user.getFriendRequestSetting());
     }
 
     // Update My User Info
@@ -56,7 +56,7 @@ public class UserEndpoint {
         user.setReceivedDmsTablePath(updateDto.getReceivedDmsTablePath());
         user.setFriendListTablePath(updateDto.getFriendListTablePath());
         userRepository.save(user);
-        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath(), user.getFriendListTablePath());
+        return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath(), user.getFriendListTablePath(), user.getFriendRequestSetting());
     }
 
     @DeleteMapping("/delete")

@@ -50,6 +50,11 @@ public class User {
     @Column(length = FieldSize.NORMAL_TEXT_LEN)
     private String receivedDmsTablePath; // identityHandle@serviceUuid}@tableUuid
 
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'ALLOW_ANY_ROOM_MEMBER'")
+    private FriendRequestSetting friendRequestSetting;
+
     @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)
     private Set<ChatRoom> createdChatRooms;
 
@@ -61,5 +66,12 @@ public class User {
                 "handle='" + handle + '\'' +
                 ", admin=" + admin +
                 '}';
+    }
+
+    public enum FriendRequestSetting {
+        DENY,
+        ALLOW_SAME_SERVER,
+        ALLOW_ANY_ROOM_MEMBER,
+        ALLOW_ALL
     }
 }

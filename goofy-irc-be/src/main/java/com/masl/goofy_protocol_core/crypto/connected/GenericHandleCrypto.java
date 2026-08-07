@@ -22,12 +22,12 @@ public interface GenericHandleCrypto {
 
     // Handle & Domain Separation
     static String stripPotentialDomainFromHandle(String handle) {
-        return handle.split(Pattern.quote(DEF_DOMAIN_SEPARATOR))[0];
+        return handle.split(Pattern.quote(DEF_DOMAIN_SEPARATOR))[0].replaceAll(Pattern.quote("/"), "");
     }
     static String getPotentialDomainFromHandle(String handle) {
         String[] split = handle.split(Pattern.quote(DEF_DOMAIN_SEPARATOR));
         if (split.length > 1)
-            return split[1];
+            return split[1].replaceAll(Pattern.quote("/"), "");
         return null;
     }
 }
