@@ -134,3 +134,12 @@
   font-weight: bold;
 }
 
+
+.FisRedirectPopup {
+  z-index: 20;
+  position: fixed;
+  margin: auto;
+  padding: 1rem 3rem 2rem 3rem;
+  width: fit-content;
+  min-height: 10rem;
+}

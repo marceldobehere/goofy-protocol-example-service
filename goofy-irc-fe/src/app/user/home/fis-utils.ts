@@ -344,11 +344,20 @@ export async function setPublicFisData(newData: PublicGoofyIrcData) {
     // Get URL and open
     const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
     const resUrl: string = await fisReq(currIdentity!.handleFull, putFixedAuth, `/fis-api/redirect/update-public-identity-entry/${identityHandle}`, updateDto, currIdentity);
-    window.open(resUrl, "_blank")?.focus();
+
+    const fisDialog: HTMLDialogElement = document.getElementById("fis-dialog") as HTMLDialogElement;
+    const fisHref: HTMLLinkElement = document.getElementById("fis-dialog-href") as HTMLLinkElement;
+    const fisCancel: HTMLButtonElement = document.getElementById("fis-dialog-cancel") as HTMLButtonElement;
 
     // Wait for update
     const prom = new Promise((resolve) => {
         console.debug("Waiting for Public FIS Data to be updated...");
+        fisCancel.onclick = () => {fisDialog.close(); resolve(null)};
+        fisHref.href = resUrl;
+        fisDialog.showModal();
+        fisHref.focus();
+        // window.open(resUrl, "_blank")?.focus();
+
         const id = setInterval(async () => {
             const data = await getPublicFisData();
             if (JSON.stringify(data.services[PUBLIC_SERVICE_NAME]) == JSON.stringify(newData)) {
@@ -357,13 +366,16 @@ export async function setPublicFisData(newData: PublicGoofyIrcData) {
                 resolve(null);
             }
         }, 1000);
-        sleep(30_000).then(() => {
+        sleep(50_000).then(() => {
             console.debug("Timeout while waiting for Public FIS Data to be updated");
             clearInterval(id);
             resolve(null);
         })
     });
     await prom;
+
+    if (fisDialog != null)
+        fisDialog.close();
 }
 
 export async function uploadFisData(data: File): Promise<string | null> {

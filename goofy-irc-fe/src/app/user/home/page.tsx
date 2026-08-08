@@ -648,9 +648,21 @@ export default function Page() {
     });
 
     // TODO: Improve Styling + Add Mobile Support
-    // TODO: Allow sending Media Files / Images
     return (
         <main>
+            <dialog id={"fis-dialog"} className={styles.FisRedirectPopup}>
+                <button id={"fis-dialog-cancel"} style={{position: "absolute", top: "1rem", right: "1rem", fontSize: "1.2rem", width: "1.6rem"}}>X</button>
+                <h2>Update Public Data</h2>
+                <br/>
+                <p>
+                    You can only update your public identity data inside your FIS Client!<br/>
+                    Press Enter / Click the link below to get redirected to the FIS Frontend with the Update set.<br/>
+                    The FIS page sadly cant close itself automatically, so you will just need to close it.<br/><br/>
+                    (This dialog will close when you update the data, cancel it or automatically after ~50s)
+                </p>
+                <br/><br/>
+                <div style={{margin: "auto", textAlign: "center"}}><a id={"fis-dialog-href"} target={"_blank"}>Open FIS Frontend</a></div>
+            </dialog>
             <div className={styles.PageContainer}>
                 <h2 className={styles.Title}>Home</h2>
 
