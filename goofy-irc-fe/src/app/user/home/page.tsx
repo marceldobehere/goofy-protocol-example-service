@@ -27,7 +27,7 @@ import {
     addStoredIrcServerIfDoesntExist, compStrArrays, deleteStoredIrcServer, findPublicDataForHandle,
     getStoredIrcServerList,
     prepFisUtils, setDescription, uploadFisData, uploadPfp
-} from "@/app/user/home/fis-utils";
+} from "@/app/user/fis-utils";
 import {PublicGoofyIrcData} from "@/libs/service-dtos";
 import {renderMessage, renderRoomDetails, renderRoomEntry, renderRoomTyping} from "@/app/user/home/render-utils";
 
@@ -50,7 +50,6 @@ export default function Page() {
     const [currRoom, setCurrRoom] = useState<LocalRoomData | null>(null);
     const [currMsgs, setCurrMsgs] = useState<LocalChatMessage[]>([]);
 
-    // const [dmList, setDmList] = useState<string[]>(["TEST"]);
     const [myRoomList, setMyRoomList] = useState<LocalRoomData[]>([]);
     const [availableRoomList, setAvailableRoomList] = useState<LocalRoomData[]>([]);
 
@@ -664,10 +663,10 @@ export default function Page() {
                 <div style={{margin: "auto", textAlign: "center"}}><a id={"fis-dialog-href"} target={"_blank"}>Open FIS Frontend</a></div>
             </dialog>
             <div className={styles.PageContainer}>
-                <h2 className={styles.Title}>Home</h2>
+                <h2 className={styles.Title}>Home / Live IRC Chat</h2>
 
                 <br/>
-                <p>Hello, {GlobalState.handle}! This is the Home Page.</p><br/>
+                <p>Hello, {GlobalState.handle}!</p><br/>
                 <div>
                     <button onClick={() => {uploadPfp(false).then(sendPublicDataUpdate)}}>Set PFP</button><span> &nbsp; </span>
                     <button onClick={() => {uploadPfp(true).then(sendPublicDataUpdate)}}>Reset PFP</button><span> &nbsp; </span>
@@ -678,6 +677,7 @@ export default function Page() {
                     <button onClick={logout}>Logout</button><br/>
                     {GlobalState.isAdmin ? <Link href="/admin/home">Admin</Link> : null}
                     <Link href={"/"}>Index</Link>
+                    <Link href={"/user/dms"} target={"_blank"}>DMs</Link>
                 </div>
 
                 <br/><hr/><br/>
@@ -690,12 +690,6 @@ export default function Page() {
                             <button onClick={addIrcServer}>Add Goofy IRC Server</button>
                         </div>
                         <hr/>
-                        {/*<div className={styles.MainSidebarListBlock}>*/}
-                        {/*    <h3>My DMs</h3>*/}
-                        {/*    <ul><li>TODO</li></ul>*/}
-                        {/*    <button>Create DM</button>*/}
-                        {/*</div>*/}
-                        {/*<hr/>*/}
                         <div className={styles.MainSidebarListBlock}>
                             <h3>My Rooms</h3>
                             {/* eslint-disable-next-line react-hooks/refs */}

@@ -2,7 +2,7 @@
 
 import {useState} from "react";
 import {useAsyncEffect} from "@/libs/global-state";
-import {BucketData, getFisBucketData} from "@/app/user/home/fis-utils";
+import {BucketData, getFisBucketData} from "@/app/user/fis-utils";
 import {downloadBinaryFile} from "@/libs/file-utils";
 
 const dataMap: Map<string, BucketData> = new Map();

@@ -17,7 +17,7 @@ import {
     TableBasicQueryDto,
     TableSelectDto
 } from "@/libs/service-dtos";
-import {getFixedAuth, getFixedAuthBytes, putFixedAuth} from "@/libs/req";
+import {getAuth, getFixedAuth, getFixedAuthBytes, postAuth, putFixedAuth} from "@/libs/req";
 import {deriveHandleFromPublicSplitKey} from "@/libs/crypto";
 import {IrcHandleLookupDto} from "@/libs/dtos";
 import {sleep} from "@/libs/utils";
@@ -80,6 +80,27 @@ const tableSchemaFriendRequests: LocalTableStructure = {
     }]
 }
 
+// To let the server send friend requests
+const tableSchemaSentFriendRequests: LocalTableStructure = {
+    tableName: "sent_friend_requests",
+    schemaVersion: 2,
+    handlesWithReadPerms: [],
+    handlesWithWritePerms: [],
+    columns: [{
+        colName: "handle",
+        type: "VAR_STRING_N", typeSize: 128,
+        constraints: ["PRIMARY_KEY", "NOT_NULL"]
+    }, {
+        colName: "sent_at",
+        type: "BIGINT", // just using a number timestamp
+        constraints: ["NOT_NULL"]
+    },{
+        colName: "server_url",
+        type: "VAR_STRING_N", typeSize: 300,
+        constraints: []
+    }]
+}
+
 // Storing DMs
 const tableSchemaDMs: LocalTableStructure = {
     tableName: "stored_dms",
@@ -133,6 +154,7 @@ let serviceEntry: ServiceEntryDto | null = null;
 let tableServerList: ServiceTableEntryDto | null = null;
 let tableFriendList: ServiceTableEntryDto | null = null;
 let tableFriendRequests: ServiceTableEntryDto | null = null;
+let tableSentFriendRequests: ServiceTableEntryDto | null = null;
 let tableDms: ServiceTableEntryDto | null = null;
 let tableReceivedDms: ServiceTableEntryDto | null = null;
 
@@ -172,6 +194,8 @@ export async function prepFisUtils() {
     const tableFriendListPromise = prepareTable(currIdentity, serviceEntry.uuid, tableSchemaFriendList);
     // Setup Table for Friend Requests
     const tableFriendRequestsPromise = prepareTable(currIdentity, serviceEntry.uuid, tableSchemaFriendRequests);
+    // Setup Table for Sent Friend Requests
+    const tableSentFriendRequestsPromise = prepareTable(currIdentity, serviceEntry.uuid, tableSchemaSentFriendRequests);
     // Setup Table for DM messages (private, should be encrypted)
     const tableDmsPromise = prepareTable(currIdentity, serviceEntry.uuid, tableSchemaDMs);
     // Setup Table for new DMs (Server can write)
@@ -184,6 +208,8 @@ export async function prepFisUtils() {
     console.debug("Table FriendList: ", tableFriendList);
     tableFriendRequests = await tableFriendRequestsPromise;
     console.debug("Table FriendRequests: ", tableFriendRequests);
+    tableSentFriendRequests = await tableSentFriendRequestsPromise;
+    console.debug("TableSentFriendRequests: ", tableSentFriendRequests);
     tableDms = await tableDmsPromise;
     console.debug("Table DMs: ", tableDms);
     tableReceivedDms = await tableReceivedDmsPromise;
@@ -214,10 +240,12 @@ export async function prepFisUtils() {
         await setPublicFisData(newData);
     }
 
-    // TODO: maybe move that to diff methods
+    // Check Friend Stuff
+    await checkAllFriendStuff();
+
+    // TODO: Check DMs
     // Lock "New DMs" Table, process messages, unlock Table
     // Update DM Status (unread messages, etc.)
-    // Display Friend Requests, doesn't need processing
 }
 
 // Get/Create Service Entry with Name
@@ -458,6 +486,266 @@ export async function getFisBucketData(mediaPath: string, roomServerUrl: string,
         blob,
         blobUrl: url
     }
+}
+
+export interface LocalMember {
+    handle: string;
+    nickname?: string;
+    serverUrl: string;
+    isFriendsRn?: boolean;
+}
+
+export async function checkAllFriendStuff() {
+    await checkReceivedFriendRequests();
+    await checkSentFriendRequests();
+    await checkFriendList();
+}
+
+// TODO: go through each received friend request and see if any of them match our Sent Friend Request Table
+// if yes, remove them from both Tables and add to Friend Table
+export async function checkReceivedFriendRequests() {
+    await prepIfNeeded();
+
+    // Get Sent Requests
+    const sentRequests: string[] = [];
+    {
+        const query: TableSelectDto = {colNames: ["handle"]};
+        const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableSentFriendRequests!.tableUuid!, query);
+        for (const row of res.rows)
+            sentRequests.push(row[0] as string);
+    }
+
+    // Get Received Requests
+    const receivedRequests: string[] = [];
+    {
+        const query: TableSelectDto = {colNames: ["handle"]};
+        const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableFriendRequests!.tableUuid!, query);
+        for (const row of res.rows)
+            receivedRequests.push(row[0] as string);
+    }
+
+    // Check if we received any that we sent
+    for (const handle of receivedRequests) {
+        if (!sentRequests.includes(handle))
+            continue;
+
+        await addAsFriend(handle);
+
+        // Send Update if needed
+        const info = await findPublicDataForHandle(handle, await getBaseServerUrl());
+        if (info) {
+            // Send Update Friends
+            await postAuth(`${info.serverUrl}/api/priv/update-friends/${handle}`, "");
+
+        }
+    }
+}
+
+// TODO: go through each sent friend request and ask if we are friends now
+// If yes, remove from Sent Friend Request Table and add to Friend Table
+export async function checkSentFriendRequests() {
+
+}
+
+// TODO: go through each friend and ask if we are still friends
+// if no, remove from friends list
+export async function checkFriendList() {
+    // await prepIfNeeded();
+    // const query: TableSelectDto = {
+    //     colNames: ["handle"]
+    // };
+
+    // TODO: Add back but either have some minimum buffer or extra field if they were ever friends
+    // const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableFriendList!.tableUuid!, query);
+    // for (const row of res.rows) {
+    //     const handle = row[0] as string;
+    //     const info = await findPublicDataForHandle(handle, await getBaseServerUrl());
+    //     if (info) {
+    //         try {
+    //             const stillFriends: boolean = await getAuth(`${info.serverUrl}/api/priv/is-friend/${handle}`)
+    //             console.log("STILL FRIENDS?", stillFriends);
+    //             if (!stillFriends) {
+    //                 await removeFriend(handle);
+    //             }
+    //         } catch (e) {
+    //             console.error(`Failed to get Is Friend Info for Handle: ${handle}`, e);
+    //         }
+    //     } else {
+    //         console.error(`Could not find Friend Request Info for: ${handle}`);
+    //     }
+    // }
+}
+
+async function addAsFriend(memberHandle: string) {
+    await prepIfNeeded();
+    // Add to Friends Table
+    // Add to Sent Friend Request Table
+    await insertIntoTable(currIdentity!, serviceEntry!.uuid, tableFriendList!.tableUuid!, {
+        "handle": memberHandle,
+        "nickname": prompt("Enter a nickname for " + memberHandle),
+    });
+
+    // Remove from Sent & Received Table
+    const query: TableBasicQueryDto = {
+        where: {
+            type: "C_EQ",
+            conditionParts: [
+                {type: "COL", colName: "handle"},
+                {type: "VAL", value: memberHandle, valueType: "FIXED_STRING_N"}
+            ]
+        }
+    };
+    await deleteFromTable(currIdentity!, serviceEntry!.uuid, tableFriendRequests!.tableUuid!, query);
+    await deleteFromTable(currIdentity!, serviceEntry!.uuid, tableSentFriendRequests!.tableUuid!, query);
+}
+
+// TODO: remove from Friends Table
+async function removeFriend(handle: string) {
+    await prepIfNeeded();
+// Remove from Friends Table
+    const query: TableBasicQueryDto = {
+        where: {
+            type: "C_EQ",
+            conditionParts: [
+                {type: "COL", colName: "handle"},
+                {type: "VAL", value: handle, valueType: "FIXED_STRING_N"}
+            ]
+        }
+    };
+    await deleteFromTable(currIdentity!, serviceEntry!.uuid, tableFriendList!.tableUuid!, query);
+}
+
+export async function unfriend(member: LocalMember) {
+    await prepIfNeeded();
+    await removeFriend(member.handle);
+
+    // Send Unfriend Request
+    try {
+        await postAuth(`${member.serverUrl}/api/priv/unfriend/${member.handle}`, "");
+
+    } catch (e) {
+        if (member.isFriendsRn)
+            throw e;
+        console.log("Silent Unfriend Error Catch:", e);
+    }
+}
+
+export async function sendFriendRequest(member: LocalMember) {
+    await prepIfNeeded();
+
+    // Check Sent Friend Request Table
+    {
+        const query: TableSelectDto = {colNames: ["handle"]};
+        const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableSentFriendRequests!.tableUuid!, query);
+        let shouldRemove = false;
+        for (const row of res.rows)
+            if (row[0] as string == member.handle) {
+                shouldRemove = true;
+                break;
+            }
+
+        // Delete if needed
+        if (shouldRemove) {
+            const query: TableBasicQueryDto = {
+                where: {
+                    type: "C_EQ",
+                    conditionParts: [
+                        {type: "COL", colName: "handle"},
+                        {type: "VAL", value: member.handle, valueType: "FIXED_STRING_N"}
+                    ]
+                }
+            };
+            await deleteFromTable(currIdentity!, serviceEntry!.uuid, tableSentFriendRequests!.tableUuid!, query);
+        }
+    }
+
+    // Send Friend Request
+    await postAuth(`${member.serverUrl}/api/priv/friend-request/${member.handle}`, "");
+
+    // Add to Sent Friend Request Table
+    await insertIntoTable(currIdentity!, serviceEntry!.uuid, tableSentFriendRequests!.tableUuid!, {
+        "handle": member.handle,
+        "sent_at": Date.now(),
+        "server_url": member.serverUrl,
+    });
+}
+
+export async function actOnReceivedFriendRequests(member: LocalMember, action: "DELETE" | "DENY" | "ACCEPT") {
+    await prepIfNeeded();
+    if (action === "DELETE" || action === "DENY") {
+        const query: TableBasicQueryDto = {
+            where: {
+                type: "C_EQ",
+                conditionParts: [
+                    {type: "COL", colName: "handle"},
+                    {type: "VAL", value: member.handle, valueType: "FIXED_STRING_N"}
+                ]
+            }
+        };
+        await deleteFromTable(currIdentity!, serviceEntry!.uuid, tableFriendRequests!.tableUuid!, query);
+
+        // TODO: Implement "DENY" ?
+    } else if (action === "ACCEPT") {
+        await addAsFriend(member.handle);
+
+        // Send Friend Request
+        await postAuth(`${member.serverUrl}/api/priv/friend-request/${member.handle}`, "");
+    }
+}
+
+
+export async function getFriendList(allMembers: LocalMember[]): Promise<LocalMember[]> {
+    await prepIfNeeded();
+    const query: TableSelectDto = {
+        colNames: ["handle", "nickname"]
+    };
+
+    const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableFriendList!.tableUuid!, query);
+    const list: LocalMember[] = [];
+    for (const row of res.rows) {
+        const foundMember = allMembers.find((m) => m.handle == row[0]);
+        if (foundMember) {
+            let isFriends: boolean = false;
+            try {
+                isFriends = await getAuth(`${foundMember.serverUrl}/api/priv/is-friend/${foundMember.handle}`)
+            } catch (e) {
+                console.error(`Failed to get Is Friend Info for Handle: ${foundMember.handle}`, e);
+            }
+
+
+            list.push({
+                handle: foundMember.handle,
+                serverUrl: foundMember.serverUrl,
+                nickname: row[1] as string,
+                isFriendsRn: isFriends
+            });
+        } else {
+            console.error(`Could not find Friend Info for: ${row[0]}`);
+        }
+    }
+    return list;
+}
+
+export async function getFriendRequestList(): Promise<LocalMember[]> {
+    await prepIfNeeded();
+    const query: TableSelectDto = {
+        colNames: ["handle"]
+    };
+
+    const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableFriendRequests!.tableUuid!, query);
+    const list: LocalMember[] = [];
+    for (const row of res.rows) {
+        const info = await findPublicDataForHandle(row[0] as string, await getBaseServerUrl());
+        if (info) {
+            list.push({
+                handle: row[0] as string,
+                serverUrl: info.serverUrl
+            });
+        } else {
+            console.error(`Could not find Friend Request Info for: ${row[0]}`);
+        }
+    }
+    return list;
 }
 
 export function compStrArrays(oldArr: string[], newArr: string[]): { identical: boolean; addedValues: string[]; removedValues: string[] } {
