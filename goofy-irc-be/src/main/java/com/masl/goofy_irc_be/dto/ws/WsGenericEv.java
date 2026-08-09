@@ -19,6 +19,8 @@ public class WsGenericEv {
         UPDATE_TYPING,
         UPDATE_ROOM_LIST,
         UPDATE_ROOM_DATA,
-        UPDATE_IDENTITY
+        UPDATE_IDENTITY,
+        NEW_FRIEND_REQUEST,
+        NEW_DM
     }
 }

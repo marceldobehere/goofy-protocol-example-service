@@ -31,7 +31,7 @@ public class HandleHelper implements HandleCryptoHelper {
     private final GeneralProperties generalProperties;
 
     private final RestClient restClient = RestClient.create();
-    private final String[] supportedFisProtocols = new String[] { "https://", "http://" };
+    public static final String[] supportedFisProtocols = new String[] { "https://", "http://" };
 
     public HandleHelper(CachedKeyHandleRepository cachedKeyHandleRepository, UserRepository userRepository, GeneralProperties generalProperties) {
         this.cachedKeyHandleRepository = cachedKeyHandleRepository;

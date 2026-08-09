@@ -5,4 +5,7 @@ public class AllServerErrorCodes {
     // public static final int BASE = 2_000_000;
     
     public static final int PUBLIC_KEY_LOOKUP_FAILED = 2_001_001;
+
+    public static final int FIS_REQUEST_ERROR = 2_002_001;
+    public static final int FIS_REQUEST_VALIDATION_ERROR = 2_002_002;
 }

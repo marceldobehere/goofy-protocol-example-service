@@ -71,7 +71,7 @@ public class User {
     public enum FriendRequestSetting {
         DENY,
         ALLOW_SAME_SERVER,
-        ALLOW_ANY_ROOM_MEMBER,
+        ALLOW_ANY_ROOM_MEMBER, // ONLY IN THIS SERVER
         ALLOW_ALL
     }
 }

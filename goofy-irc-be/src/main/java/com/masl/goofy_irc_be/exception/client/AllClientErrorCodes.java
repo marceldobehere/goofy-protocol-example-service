@@ -25,4 +25,11 @@ public class AllClientErrorCodes {
     public static final int ROOM_MEMBER_ALREADY_BANNED = 1_003_010;
     public static final int ROOM_MEMBER_NOT_BANNED = 1_003_011;
     public static final int ROOM_MEMBER_IS_BANNED = 1_003_012;
+
+    public static final int PRIV_USER_NOT_FOUND = 1_004_001;
+    public static final int PRIV_USER_FIS_LOOKUP_FAILED = 1_004_002;
+    public static final int PRIV_NOT_FRIENDS = 1_004_003;
+    public static final int PRIV_FRIEND_REQUESTS_NOT_ALLOWED = 1_004_004;
+    public static final int PRIV_FRIEND_REQUEST_ALREADY_SENT = 1_004_005;
+    public static final int PRIV_ALREADY_FRIENDS = 1_004_006;
 }

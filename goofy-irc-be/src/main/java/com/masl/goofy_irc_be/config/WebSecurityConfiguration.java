@@ -90,6 +90,7 @@ public class WebSecurityConfiguration {
                     .requestMatchers("/api/register/**").permitAll() // Registration of Users
                     .requestMatchers("/api/user/**").permitAll() // User Info
                     .requestMatchers("/api/chatroom/**").hasRole(ROLES.OUTSIDE_ENTITY) // Chat Rooms
+                    .requestMatchers("/api/priv/**").hasRole(ROLES.OUTSIDE_ENTITY) // Friend Requests & DMs
                     .requestMatchers("/api/redirect/**").permitAll() // Redirect Links for Service Login/Config/Access
                     .requestMatchers("/api/admin/**").hasRole(ROLES.ADMIN)
                     .anyRequest().hasRole(ROLES.ADMIN);
