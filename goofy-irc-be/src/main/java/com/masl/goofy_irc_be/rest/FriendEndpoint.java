@@ -158,7 +158,7 @@ public class FriendEndpoint {
 
     // Unfriend
     @PostMapping("/unfriend/{handle}")
-    @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
+    @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
     @IrcEndpoint(summary = "Unfriends a handle")
     public void unfriend(@PathVariable String handle, @AuthenticationPrincipal GoofyAuthUser auth) throws NotFriends, UserNotFound, UserFisLookupFailed, FisRequestError, FisRequestValidationError {
         log.debug("unfriend called for handle: {} by auth: {}", handle, auth.getHandle());
