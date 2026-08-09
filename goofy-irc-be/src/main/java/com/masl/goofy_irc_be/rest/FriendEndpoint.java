@@ -90,6 +90,8 @@ public class FriendEndpoint {
             boolean shareRooms = chatRoomRepository.findAllByCreatedBy_Handle_OrMembersContaining(auth.getHandle(), auth.getHandle())
                     .stream().anyMatch(room -> userRooms.contains(room.getName()));
 
+            // TODO: Check if the user has the handle in the sent friend request table!!!
+
             if (!shareRooms)
                 throw new FriendRequestsNotAllowed();
         }

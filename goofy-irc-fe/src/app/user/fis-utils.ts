@@ -181,8 +181,10 @@ export async function prepFisUtils() {
     tableSchemaFriendRequests.handlesWithWritePerms = [serverInfo.handle];
     tableSchemaReceivedDms.handlesWithReadPerms = [serverInfo.handle];
     tableSchemaReceivedDms.handlesWithWritePerms = [serverInfo.handle];
-    tableSchemaFriendList.handlesWithReadPerms = [serverInfo.handle];
     // No write perms, just so the IRC knows which handles are friends / have DMs allowed
+    tableSchemaFriendList.handlesWithReadPerms = [serverInfo.handle];
+    tableSchemaSentFriendRequests.handlesWithReadPerms = [serverInfo.handle];
+
 
     // Await Promise
     serviceEntry = await entryPromise;
@@ -221,6 +223,12 @@ export async function prepFisUtils() {
         const friendRequestTablePath = await getTablePath(currIdentity, serviceEntry.uuid, tableFriendRequests.tableUuid!);
         const receivedDmsTablePath = await getTablePath(currIdentity, serviceEntry.uuid, tableReceivedDms.tableUuid!);
         const friendListTablePath = await getTablePath(currIdentity, serviceEntry.uuid, tableFriendList.tableUuid!);
+
+        // TODO: remove this lol
+        if (userInfo.friendRequestSetting != "ALLOW_ALL") {
+            userInfo.friendRequestSetting = "ALLOW_ALL";
+            await setUserInfo(userInfo);
+        }
 
         // Send IRC Server the Table Paths if needed
         if (userInfo.friendRequestTablePath != friendRequestTablePath || userInfo.receivedDmsTablePath != receivedDmsTablePath || userInfo.friendListTablePath != friendListTablePath) {
