@@ -52,7 +52,7 @@ public class User {
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    @ColumnDefault("'ALLOW_ANY_ROOM_MEMBER'")
+    @ColumnDefault("'ALLOW_ALL'") // TODO: change maybe?
     private FriendRequestSetting friendRequestSetting = FriendRequestSetting.ALLOW_ANY_ROOM_MEMBER;
 
     @OneToMany(mappedBy="createdBy", orphanRemoval = true, cascade = CascadeType.REMOVE)

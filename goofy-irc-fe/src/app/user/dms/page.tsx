@@ -303,6 +303,7 @@ export default function Page() {
         }
     }
 
+    // TODO: Handle when one person is on a diff server and doesn't allow from anyone blegh
     async function acceptFriendReq(member: LocalMember) {
         await actOnReceivedFriendRequests(member, "ACCEPT");
         await getMembersAndDmsAndFriendRequests();
