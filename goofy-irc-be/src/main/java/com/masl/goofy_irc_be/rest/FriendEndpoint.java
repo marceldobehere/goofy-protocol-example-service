@@ -118,7 +118,7 @@ public class FriendEndpoint {
 
     // Send DM
     @PostMapping("/dm/{handle}")
-    @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
+    @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
     @IrcEndpoint(summary = "Sends a friend a DM")
     public void sendDm(@PathVariable String handle, @RequestBody String msgObj, @AuthenticationPrincipal GoofyAuthUser auth) throws NotFriends, UserNotFound, UserFisLookupFailed, FisRequestError, FisRequestValidationError {
         log.debug("sendDm called for handle: {} by auth: {}", handle, auth.getHandle());
@@ -140,7 +140,7 @@ public class FriendEndpoint {
 
     // Update Friends List (e.g. bc accepted)
     @PostMapping("/update-friends/{handle}")
-    @PreAuthorize("hasRole('ROLE_REGISTERED_USER')")
+    @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
     @IrcEndpoint(summary = "Sends a friend a DM")
     public void updateFriends(@PathVariable String handle, @AuthenticationPrincipal GoofyAuthUser auth) throws NotFriends, UserNotFound, UserFisLookupFailed, FisRequestError, FisRequestValidationError {
         // Find User
