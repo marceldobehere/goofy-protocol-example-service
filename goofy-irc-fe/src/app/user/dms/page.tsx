@@ -9,7 +9,20 @@ import {useRef, useState} from "react";
 import {ChatRoomDto, LocalServerData, WsGenericEv} from "@/libs/dtos";
 import {getBaseServerUrl} from "@/libs/auth-store";
 import { getAuth} from "@/libs/req";
-import {actOnReceivedFriendRequests, addStoredIrcServerIfDoesntExist, checkAllFriendStuff, getFriendList, getFriendRequestList, getStoredIrcServerList, LocalMember, prepFisUtils, sendFriendRequest, unfriend} from "@/app/user/fis-utils";
+import {
+    actOnReceivedFriendRequests,
+    addStoredIrcServerIfDoesntExist,
+    checkAllFriendStuff,
+    findPublicDataForHandle,
+    getFriendList,
+    getFriendRequestList,
+    getStoredIrcServerList,
+    LocalMember,
+    prepFisUtils,
+    sendFriendRequest,
+    unfriend
+} from "@/app/user/fis-utils";
+import {PublicGoofyIrcData} from "@/libs/service-dtos";
 
 export default function Page() {
     const [defaultServer, setDefaultServer] = useState<LocalServerData | null>(null);
@@ -221,24 +234,58 @@ export default function Page() {
 
         const memberList: LocalMember[] = [];
         const memberSet: Set<string> = new Set();
+        const lostMemberSet: Set<string> = new Set();
         memberSet.add(GlobalState.handle);
 
         for (const server of servers) {
             try {
                 const list = await getAuth<ChatRoomDto[]>(server.serverUrl + "/api/chatroom/list/my");
                 list.forEach(room => {
-                    room.members?.forEach(member => {
-                        if (!memberSet.has(member)) {
-                            memberSet.add(member);
-                            memberList.push({
-                                handle: member,
-                                serverUrl: server.serverUrl,
-                            })
-                        }
-                    })
+                    if (room.allowGuests)
+                        room.members?.forEach((member) => {
+                            if (!memberSet.has(member))
+                                lostMemberSet.add(member);
+                        })
+                    else
+                        room.members?.forEach(member => {
+                            if (!memberSet.has(member)) {
+                                memberSet.add(member);
+                                memberList.push({
+                                    handle: member,
+                                    serverUrl: server.serverUrl,
+                                })
+                            }
+                        })
                 })
             } catch (e) {
                 console.error(`Failed to load my rooms from server ${server.serverName} (${server.serverUrl}):`, e);
+            }
+        }
+
+        // Remove members from lostSet
+        for (const member of [...lostMemberSet.keys()])
+            if (memberSet.has(member))
+                lostMemberSet.delete(member);
+
+        // try looking up lostMemberSet
+        for (const member of lostMemberSet.keys()) {
+            let foundInfo: PublicGoofyIrcData | null = null;
+            for (const server of servers) {
+                try {
+                    const info = await findPublicDataForHandle(member, server.serverUrl);
+                    if (info) {
+                        foundInfo = info;
+                        break;
+                    }
+                } catch {
+
+                }
+            }
+            if (foundInfo) {
+                memberList.push({
+                    handle: member,
+                    serverUrl: foundInfo.serverUrl
+                })
             }
         }
 
