@@ -14,7 +14,7 @@ public class GeneralProperties {
     private String name;
     private String description;
     private String contact;
-    public final static String version = "0.4.7";
+    public final static String version = "0.5.2";
 
     public String getDomain() {
         URI uri = URI.create(url);
