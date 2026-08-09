@@ -55,6 +55,7 @@ public class UserEndpoint {
         user.setFriendRequestTablePath(updateDto.getFriendRequestTablePath());
         user.setReceivedDmsTablePath(updateDto.getReceivedDmsTablePath());
         user.setFriendListTablePath(updateDto.getFriendListTablePath());
+        user.setFriendRequestSetting(updateDto.getFriendRequestSetting());
         userRepository.save(user);
         return new MyUserInfoDto(auth.getHandle(), generalProperties.getDomain(), user.getPubSplitKey(), user.isAdmin() ? ROLES.AuthRoleEnumDto.ADMIN : ROLES.AuthRoleEnumDto.REGISTERED_USER, user.getFriendRequestTablePath(), user.getReceivedDmsTablePath(), user.getFriendListTablePath(), user.getFriendRequestSetting());
     }
