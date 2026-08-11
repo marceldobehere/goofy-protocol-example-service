@@ -82,6 +82,8 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
 ## How can I try it?
 To try the currently deployed Goofy IRC out, you will need to be registered on a [FIS](https://github.com/marceldobehere/goofy-protocol-fis) Instance. If you aren't yet or don't know what a `FIS` is, you should look into it first! (If you want to test it locally, you can set the FIS and IRC Service up locally and run it that way)
 
+**NOTE** IF you haven't registered at the FIS before and are gonna follow the Link, please make sure to **come back here** to know how to register for the FIS! (people seem to forget xd)
+
 Once you have a FIS account, you can go to your `Identity Storage` and Create a new Identity (or use an existing one) to use for the Goofy IRC instance! You will need to Export your Keypair.
 
 
