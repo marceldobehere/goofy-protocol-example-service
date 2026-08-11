@@ -28,9 +28,12 @@ export function renderRoomTyping(currRoom: LocalRoomData | null) {
     if (currRoom == null || currRoom.room.members == null || currRoom.room.memberStatus == null)
         return <></>;
 
-    const typingPpl = currRoom.room.memberStatus
-        .filter((stat, idx) => stat.typingInRoom != null && currRoom.room.members![idx] != GlobalState.handle)
-        .map((_, idx) => currRoom.room.members![idx]);
+    const typingPpl = [];
+    for (let idx = 0; idx < currRoom.room.members.length; idx++)
+        if (currRoom.room.memberStatus[idx].typingInRoom == currRoom.room.name &&
+            currRoom.room.members[idx] != GlobalState.handle)
+            typingPpl.push(currRoom.room.members[idx]);
+
     if (typingPpl.length == 0)
         return <></>;
 
