@@ -57,7 +57,9 @@ public class GoofyAuthFilter extends OncePerRequestFilter {
         this.handleHelper = handleHelper;
     }
 
-    public GoofyAuth getGoofyAuthFromSignedRequest(Map<String, String> headers, String method, String path, byte[] body) throws PublicKeyLookupFailed, InvalidSignature {
+    public GoofyAuth getGoofyAuthFromSignedRequest(Map<String, String> _headers, String method, String path, byte[] body) throws PublicKeyLookupFailed, InvalidSignature {
+        var headers = SignedRequest.fixHeaderCasing(_headers);
+
         // Check Headers
         if (!SignedRequest.hasAllRequestHeaders(headers))
             throw new InvalidSignature(SignedRequest.SignedRequestValidity.MISSING_PARTS);
