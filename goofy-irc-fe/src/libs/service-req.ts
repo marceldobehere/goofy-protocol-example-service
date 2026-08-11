@@ -19,9 +19,8 @@ import {
 import {getFisUrlsFromHandle, IdentityAsymmFullKeyPair} from "@/libs/auth";
 import {readFileBytes, uploadData} from "@/libs/file-utils";
 import {
-    asymmEncryptBytesRaw,
     deriveHandleFromPublicSplitKey,
-    parseFullHandle, symmEncryptBytesRaw, symmEncryptObj
+    parseFullHandle, symmEncryptBytesRaw
 } from "@/libs/crypto";
 import {isNetworkErrorTypeError} from "@/libs/global-state";
 import {AsymmPubKeyPair} from "@/libs/crypto-types";
