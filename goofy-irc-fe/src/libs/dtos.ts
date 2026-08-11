@@ -52,6 +52,7 @@ export class AllClientErrorCodes {
 export class AllServerErrorCodes {
     static readonly DEFAULT: number = 2_000_000;
     static readonly PUBLIC_KEY_LOOKUP_FAILED: number = 2_001_001;
+    static readonly SERVICE_TABLE_LOCKED = 2_008_002;
 }
 
 
@@ -157,7 +158,8 @@ export type WsGenericEvEventType =
     | "UPDATE_ROOM_LIST"
     | "UPDATE_ROOM_DATA"
     | "UPDATE_IDENTITY"
-    | "NEW_FRIEND_REQUEST";
+    | "NEW_FRIEND_REQUEST"
+    | "NEW_DM";
 
 export class WsError extends WsGenericEv {
     errorMsg: string;
@@ -234,6 +236,15 @@ export class WsUpdateIdentity extends WsGenericEv {
     }
 }
 
+export class WsNewDm extends WsGenericEv {
+    handleFrom: string;
+
+    constructor(handleFrom: string) {
+        super("NEW_DM");
+        this.handleFrom = handleFrom;
+    }
+}
+
 export interface LocalServerData {
     serverUrl: string;
     serverName: string;
@@ -246,8 +257,6 @@ export interface LocalRoomData {
     sameRoomNameInDiffServer: boolean;
 }
 
-
-
 export interface LocalChatMessage {
     msgObj: ChatMessageDto;
     handle: string;
@@ -256,6 +265,19 @@ export interface LocalChatMessage {
     sig: string;
     sigValid: boolean;
     isRealMessage: boolean;
+}
+
+export interface DmDbMessage {
+    msgObj: ChatMessageDto;
+    handle: string;
+    sig: string;
+    sigValid: boolean;
+    isRealMessage: boolean;
+}
+
+export interface DmSendMessage {
+    msgObj: ChatMessageDto;
+    sig: string;
 }
 
 

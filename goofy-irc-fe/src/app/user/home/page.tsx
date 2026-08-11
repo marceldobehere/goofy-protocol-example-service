@@ -96,7 +96,7 @@ export default function Page() {
             return;
 
         // console.debug(`Fetching Public Data for ${handle} on ${ircServerBase}...`);
-        const info = await findPublicDataForHandle(handle, ircServerBase);
+        const info = await findPublicDataForHandle(handle, ircServerBase, true);
         console.debug(`Fetched Public Data for ${handle} on ${ircServerBase}:`, info);
         allPublicData.set(handle, info);
     }
@@ -418,7 +418,7 @@ export default function Page() {
         if (room == null)
             return;
 
-        // TODO: Implement
+        // TODO: Implement UI
         const updatedDto = prompt("Enter updated room DTO (JSON)", JSON.stringify(room.room, null, 4));
         if (updatedDto == null || updatedDto.trim() == "")
             return;
@@ -574,12 +574,14 @@ export default function Page() {
     }
 
     async function sendPasteMessage(e: ClipboardEvent) {
-        const files = e.clipboardData?.files;
-        if (files == null || files.length === 0)
+        const _files = e.clipboardData?.files;
+        if (_files == null || _files.length === 0)
             return;
         // console.debug("Files Pasted: ", files);
-        if (currRoom == null || !confirm(`Are you sure you want to upload \"${files[0].name}\" to the current room?\nIt will also send this text: ${currentMsgText.trim()}`))
+        if (currRoom == null || !confirm(`Are you sure you want to upload \"${_files[0].name}\" to the current room?\nIt will also send this text: ${currentMsgText.trim()}`))
             return;
+
+        const files = Array.from(_files);
 
         const filePaths: string[] = [];
         for (const file of files) {

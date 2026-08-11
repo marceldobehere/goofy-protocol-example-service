@@ -18,8 +18,13 @@ import {
 } from "@/libs/req";
 import {getFisUrlsFromHandle, IdentityAsymmFullKeyPair} from "@/libs/auth";
 import {readFileBytes, uploadData} from "@/libs/file-utils";
-import {deriveHandleFromPublicSplitKey, parseFullHandle} from "@/libs/crypto";
+import {
+    asymmEncryptBytesRaw,
+    deriveHandleFromPublicSplitKey,
+    parseFullHandle, symmEncryptBytesRaw, symmEncryptObj
+} from "@/libs/crypto";
 import {isNetworkErrorTypeError} from "@/libs/global-state";
+import {AsymmPubKeyPair} from "@/libs/crypto-types";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 export async function fisReq(fullHandle: string, func: Function, path: string, ...args: unknown[]) {
@@ -56,7 +61,7 @@ export async function createServiceEntry(identityKeypair: IdentityAsymmFullKeyPa
     await fisReq(identityKeypair.handleFull, postFixedAuth, "/fis-api/service-entry", newEntry, identityKeypair);
 }
 
-export async function uploadBucketEntry(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, readAccess: string[] = ["*"], forceData: File | null = null): Promise<ServiceBucketEntryDto | null> {
+export async function uploadBucketEntry(identityKeypair: IdentityAsymmFullKeyPair, serviceEntryUuid: string, readAccess: string[] = ["*"], forceData: File | null = null, pubKey: AsymmPubKeyPair | null = null): Promise<ServiceBucketEntryDto | null> {
     const data: File | null = forceData ?? await uploadData(false) as File;
     if (data == null)
         return null;
@@ -64,7 +69,15 @@ export async function uploadBucketEntry(identityKeypair: IdentityAsymmFullKeyPai
     // Read File
     const filename = data.name;
     const dataType = data.type;
-    const bytes = await readFileBytes(data);
+    const _bytes = await readFileBytes(data);
+    let bytes: Uint8Array;
+    let secret: string | null = null;
+    if (pubKey == null)
+        bytes = _bytes;
+    else {
+        secret = crypto.randomUUID();
+        bytes = await symmEncryptBytesRaw(_bytes, secret);
+    }
 
     // Upload
     const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
@@ -74,6 +87,9 @@ export async function uploadBucketEntry(identityKeypair: IdentityAsymmFullKeyPai
     // Set Perms
     detailsDto.handlesWithReadPerms = readAccess;
     await fisReq(identityHandle, putFixedAuth, `${baseBucketUrl}/entry/${detailsDto.fileUuid}`, detailsDto, identityKeypair);
+
+    if (secret != null)
+        detailsDto.fileUuid += "#" + secret;
     return detailsDto;
 }
 
@@ -160,5 +176,3 @@ export async function getTablePath(identityKeypair: IdentityAsymmFullKeyPair, se
     const identityHandle = await deriveHandleFromPublicSplitKey(identityKeypair.pub);
     return `${identityHandle}@${serviceUuid}@${tableUuid}`;
 }
-
-// Helper Methods for Queries

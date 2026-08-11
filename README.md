@@ -39,17 +39,17 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
 * Live Updates
   * Get live updates when the Rooms Change, Members Join/Leave, etc.
   * See when people are currently typing Messages in your room
-* Friend System **(TODO)**
+* Friend System
   * Send Friend Requests to other Members
   * Manage Received Friend Requests (Accept, Deny)
-* Direct Messages **(TODO)**
+* Direct Messages
   * DMs are E2E encrypted! (Very basic, no forward secrecy, etc.)
-  * Media sent in DMs will be encrypted **(TODO)**
+  * All Media sent in DMs is also encrypted 
   * DMs are persistent
 * Federation
   * Support for connecting to multiple IRC Servers (as a Guest)
   * Option to allow Guests to participate in Rooms
-  * Friend Requests & DMs can be sent cross IRC Servers **(TODO)**
+  * Friend Requests & DMs can be sent cross IRC Servers
   * "Link" your IRC Server URL/Instance on your public FIS Entry
   * Self-hosted instances should automatically have working federation!
 * Easy to self-host and run locally
@@ -62,7 +62,7 @@ If you want to try it out, please read [this section](#how-can-i-try-it)!
 * Persistence & Sync
   * Friend Requests, Server Lists, DMs, etc. are stored on the Users FIS
     * Since it's stored on the FIS, the data is basically synced between all Clients of a User
-  * The IRC Server can store received Friend Requests & DMs while the User is offline! **(TODO)**
+  * The IRC Server stores received Friend Requests & DMs in the Users FIS while the User is offline!
 * Taking advantage of the Goofy Protocol
   * Authentication & Federation built-in
   * Service and FIS Instances can be fully decentralized

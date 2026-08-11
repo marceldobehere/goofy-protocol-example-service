@@ -9,6 +9,7 @@ import {AllServerErrorCodes, IrcExceptionDto, RequestError, RequestIrcError} fro
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
 import {SpinActivity} from "@/libs/spinner";
 import {IdentityAsymmFullKeyPair} from "@/libs/auth";
+import {sleep} from "@/libs/utils";
 
 function _isBinaryBody(body: object): body is Uint8Array {
     return body instanceof Uint8Array;
@@ -53,6 +54,9 @@ export async function _internalDoReq<T>(_path: string, method: HttpMethod, body:
     if (body != null)
         reqOptions.body = (isBodyStr || isBodyBinary) ? body as BodyInit : JSON.stringify(body);
 
+    if (path.includes("unlock") || headers.has("X-Lock-Token"))
+        reqOptions.priority = "high";
+
     // console.log(`> Sending ${method} Request to ${path} ${keypair == null ? 'without auth' : 'with auth'} and options: `, reqOptions, body);
 
     // Execute fetch
@@ -64,8 +68,14 @@ export async function _internalDoReq<T>(_path: string, method: HttpMethod, body:
         const resBodyStr = await res.text();
         try {
             const resBody = JSON.parse(resBodyStr);
-            if (resBody satisfies IrcExceptionDto && (resBody as IrcExceptionDto).errorCode == AllServerErrorCodes.PUBLIC_KEY_LOOKUP_FAILED ) {
-                return await doRequestSpinner<T>(_path, method, body, keypair, extraHeaders, bodyBytes, rawResponse, sendStep == "HANDLE" ? "HANDLE_DOMAIN" : "PUB_KEY");
+            if (resBody satisfies IrcExceptionDto) {
+                const ex = resBody as IrcExceptionDto;
+                if (ex.errorCode == AllServerErrorCodes.PUBLIC_KEY_LOOKUP_FAILED ) {
+                    return await doRequestSpinner<T>(_path, method, body, keypair, extraHeaders, bodyBytes, rawResponse, sendStep == "HANDLE" ? "HANDLE_DOMAIN" : "PUB_KEY");
+                } else if (ex.errorCode == AllServerErrorCodes.SERVICE_TABLE_LOCKED) {
+                    await sleep(Math.random() * 500 + 200);
+                    return await _internalDoReq(_path, method, body, keypair, extraHeaders, bodyBytes, rawResponse, sendStep);
+                }
             }
         } catch (e) {
             if (e instanceof RequestError || e instanceof RequestIrcError)

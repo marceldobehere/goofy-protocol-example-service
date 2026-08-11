@@ -53,8 +53,8 @@ export function isNetworkErrorTypeError(err: unknown): err is TypeError {
 export function useGlobalState(needLogin: boolean, needAdmin: boolean, fragment: FragmentNeed, doneCallback: Function, preCallback: Function | undefined = undefined, extraDependencies: never[] | undefined = undefined) {
     const pathName = usePathname();
     const [isDone, setIsDone] = useState(false);
-    if (typeof window !== "undefined")
-        console.debug("1> Use Global State", pathName, isDone, needLogin, needAdmin, fragment, extraDependencies);
+    // if (typeof window !== "undefined")
+    //     console.debug("1> Use Global State", pathName, isDone, needLogin, needAdmin, fragment, extraDependencies);
     const deps = extraDependencies === undefined ? [pathName, isDone] : [pathName, isDone, ...extraDependencies];
     useEffect(() => {
         // SSR shouldn't do anything

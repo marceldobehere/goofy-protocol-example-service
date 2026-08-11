@@ -121,6 +121,14 @@ export async function symmDecryptObj<T>(str: string, secret: SecretString): Prom
     return JSON.parse(await symmCrypto.decryptStr(str, secret) as string) as T;
 }
 
+export async function symmEncryptBytesRaw(bytes: Uint8Array, secret: SecretString, type: SymmCryptoType = SymmCryptoType.DEFAULT): Promise<Uint8Array> {
+    return await symmCrypto.encryptRaw(bytes, secret, type);
+}
+
+export async function symmDecryptBytesRaw(bytes: Uint8Array, secret: SecretString): Promise<Uint8Array> {
+    return await symmCrypto.decryptRaw(bytes, secret);
+}
+
 // Handle Stuff
 
 // TODO: Store in session storage for x amt of time

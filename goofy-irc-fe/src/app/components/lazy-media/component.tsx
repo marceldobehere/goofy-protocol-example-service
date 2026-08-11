@@ -4,6 +4,7 @@ import {useState} from "react";
 import {useAsyncEffect} from "@/libs/global-state";
 import {BucketData, getFisBucketData} from "@/app/user/fis-utils";
 import {downloadBinaryFile} from "@/libs/file-utils";
+import {sleep} from "@/libs/utils";
 
 const dataMap: Map<string, BucketData> = new Map();
 export default function Component({mediaPath, roomServerUrl, enforceSize}: {mediaPath: string, roomServerUrl: string, enforceSize: string | null}) {
@@ -13,11 +14,14 @@ export default function Component({mediaPath, roomServerUrl, enforceSize}: {medi
     useAsyncEffect(async () => {
         // console.debug("Lazy Media Component", mediaPath, roomServerUrl);
         const key = `${mediaPath}_@_${roomServerUrl}`;
+        await sleep(Math.random() * 500);
         if (dataMap.has(key)) {
+            // console.log(` > Getting cached data from ${mediaPath + "@" + roomServerUrl}`);
                setData(dataMap.get(key)!);
                setDataState("SUCCESS");
         } else {
             try {
+                // console.log(`> Fetching data from ${mediaPath + "@" + roomServerUrl}`);
                 const res = await getFisBucketData(mediaPath, roomServerUrl);
                 dataMap.set(key, res);
                 setData(res);

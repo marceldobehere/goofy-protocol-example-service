@@ -2,25 +2,46 @@
 
 import {
     createServiceEntry,
-    createTableEntry, deleteFromTable, fisReq,
+    createTableEntry,
+    deleteFromTable,
+    fisReq,
     getAllTableEntries,
-    getServiceEntries, getTablePath, insertIntoTable, queryTable,
-    updateTableEntry, uploadBucketEntry
+    getServiceEntries,
+    getTablePath,
+    insertIntoTable,
+    lockTableEntry,
+    queryTable,
+    unlockTableEntry,
+    updateTableEntry,
+    uploadBucketEntry
 } from "@/libs/service-req";
 import {getBaseServerUrl, getKeypair} from "@/libs/auth-store";
 import {getServerDetails, getUserInfo, IdentityAsymmFullKeyPair, lookUpHandle, setUserInfo} from "@/libs/auth";
 import {
     IdentityPublicData,
-    LocalTableStructure, PublicGoofyIrcData, ServiceBucketEntryDto,
-    ServiceEntryDto, ServicePublicDataUpdate,
+    LocalTableStructure,
+    PublicGoofyIrcData,
+    ServiceBucketEntryDto,
+    ServiceEntryDto,
+    ServicePublicDataUpdate,
     ServiceTableEntryDto,
     TableBasicQueryDto,
-    TableSelectDto
+    TableSelectDto,
+    TableWhereConditionPart
 } from "@/libs/service-dtos";
 import {getAuth, getFixedAuth, getFixedAuthBytes, postAuth, putFixedAuth} from "@/libs/req";
-import {deriveHandleFromPublicSplitKey} from "@/libs/crypto";
-import {IrcHandleLookupDto} from "@/libs/dtos";
+import {
+    asymmDecryptObj,
+    asymmVerifyObj,
+    deriveHandleFromPublicSplitKey,
+    parsePublicSplitKey,
+    secretSymmKeyFromFullKey, symmDecryptBytesRaw,
+    symmDecryptObj,
+    symmEncryptObj
+} from "@/libs/crypto";
+import {DmDbMessage, DmSendMessage, IrcHandleLookupDto, LocalChatMessage} from "@/libs/dtos";
 import {sleep} from "@/libs/utils";
+import {AsymmPubKeyPair} from "@/libs/crypto-types";
 
 const SERVICE_NAME = "DEMO Goofy IRC";
 const PUBLIC_SERVICE_NAME = "Goofy IRC";
@@ -104,7 +125,7 @@ const tableSchemaSentFriendRequests: LocalTableStructure = {
 // Storing DMs
 const tableSchemaDMs: LocalTableStructure = {
     tableName: "stored_dms",
-    schemaVersion: 1,
+    schemaVersion: 2,
     handlesWithReadPerms: [],
     handlesWithWritePerms: [],
     columns: [{
@@ -120,10 +141,6 @@ const tableSchemaDMs: LocalTableStructure = {
         type: "VAR_STRING_N", typeSize: 128,
         constraints: ["NOT_NULL"]
     }, {
-        colName: "sender_handle", // who sent the message (me or the other person), doesn't really need to be encrypted for this demo
-        type: "VAR_STRING_N", typeSize: 128,
-        constraints: ["NOT_NULL"]
-    }, {
         colName: "timestamp", // when the message was sent, doesn't really need to be encrypted for this demo
         type: "BIGINT", // just using a number timestamp
         constraints: ["NOT_NULL"]
@@ -133,7 +150,7 @@ const tableSchemaDMs: LocalTableStructure = {
 // Received DMs
 const tableSchemaReceivedDms: LocalTableStructure = {
     tableName: "received_dms",
-    schemaVersion: 1,
+    schemaVersion: 3,
     handlesWithReadPerms: [],
     handlesWithWritePerms: [],
     columns: [{
@@ -144,10 +161,17 @@ const tableSchemaReceivedDms: LocalTableStructure = {
         colName: "msg_json", // should be encrypted, could for example store a serialized & encrypted WsReceiveMsg (or equivalent)
         type: "VAR_STRING_N", typeSize: 20_000,
         constraints: ["NOT_NULL"],
+    }, {
+        colName: "timestamp", // when the message was sent, doesn't really need to be encrypted for this demo
+        type: "BIGINT", // just using a number timestamp
+        constraints: ["NOT_NULL"]
+    }, {
+        colName: "sender_handle", // who sent this message
+        type: "VAR_STRING_N", typeSize: 128,
+        constraints: ["NOT_NULL"],
+        defaultValue: "UNKNOWN"
     }]
 }
-
-// TODO: Manage Concurrent Message Handling with Insert Locks
 
 let currIdentity: IdentityAsymmFullKeyPair | null = null;
 let serviceEntry: ServiceEntryDto | null = null;
@@ -224,7 +248,7 @@ export async function prepFisUtils() {
         const receivedDmsTablePath = await getTablePath(currIdentity, serviceEntry.uuid, tableReceivedDms.tableUuid!);
         const friendListTablePath = await getTablePath(currIdentity, serviceEntry.uuid, tableFriendList.tableUuid!);
 
-        // TODO: remove this lol
+        // TODO: replace this with settings so the user can define who they want to get friend requests from
         if (userInfo.friendRequestSetting != "ALLOW_ALL") {
             userInfo.friendRequestSetting = "ALLOW_ALL";
             await setUserInfo(userInfo);
@@ -251,9 +275,8 @@ export async function prepFisUtils() {
     // Check Friend Stuff
     await checkAllFriendStuff();
 
-    // TODO: Check DMs
-    // Lock "New DMs" Table, process messages, unlock Table
-    // Update DM Status (unread messages, etc.)
+    // Check DMs
+    await checkReceivedDms();
 }
 
 // Get/Create Service Entry with Name
@@ -414,9 +437,9 @@ export async function setPublicFisData(newData: PublicGoofyIrcData) {
         fisDialog.close();
 }
 
-export async function uploadFisData(data: File): Promise<string | null> {
+export async function uploadFisData(data: File, pubKey: AsymmPubKeyPair | null = null): Promise<string | null> {
     await prepIfNeeded();
-    const res = await uploadBucketEntry(currIdentity!, serviceEntry!.uuid, ["*"], data);
+    const res = await uploadBucketEntry(currIdentity!, serviceEntry!.uuid, ["*"], data, pubKey);
     const identityHandle = await deriveHandleFromPublicSplitKey(currIdentity!.pub);
     return res == null ? null : `${identityHandle}@${serviceEntry?.uuid}@${res.fileUuid}`;
 }
@@ -454,15 +477,27 @@ export async function setDescription() {
     await setPublicFisData(service);
 }
 
-export async function findPublicDataForHandle(handle: string, ircServerBase: string): Promise<PublicGoofyIrcData | null> {
+const publicDataMap = new Map<string, PublicGoofyIrcData | null>();
+export async function findPublicDataForHandle(handle: string, ircServerBase: string, clearCache: boolean): Promise<PublicGoofyIrcData | null> {
     await prepIfNeeded();
+
+    const key = `${handle}@${ircServerBase}`;
+    if (clearCache)
+        publicDataMap.delete(key);
+
+    if (publicDataMap.has(key))
+        return publicDataMap.get(key) ?? null;
+
     try {
         const lookup: IrcHandleLookupDto = await lookUpHandle(handle, ircServerBase);
         const data: IdentityPublicData = await fisReq(`${lookup.handle}@${lookup.handleDomain}`, getFixedAuth, `/fis-api/identity-storage/public/${handle}`, currIdentity);
-        return data.services[PUBLIC_SERVICE_NAME] ?? null;
+        const res = data.services[PUBLIC_SERVICE_NAME] ?? null;
+        publicDataMap.set(key, res);
+        return res;
     } catch (e) {
         console.debug(`Failed to fetch info for handle ${handle} on server ${ircServerBase}:`, e);
     }
+    publicDataMap.set(key, null);
     return null;
 }
 
@@ -484,7 +519,15 @@ export async function getFisBucketData(mediaPath: string, roomServerUrl: string,
     const details: ServiceBucketEntryDto = await fisReq(fullHandle, getFixedAuth, `/fis-api/service-bucket/${lookup.handle}/${parts[1]}/entry/${parts[2]}`, currIdentity!);
     if (details.contentSize! > maxSize)
         throw new Error(`File size ${details.contentSize} exceeds max size ${maxSize}`);
-    const data: Uint8Array = await fisReq(fullHandle, getFixedAuthBytes, `/fis-api/service-bucket/${lookup.handle}/${parts[1]}/content/${parts[2]}`, currIdentity!);
+    const _data: Uint8Array = await fisReq(fullHandle, getFixedAuthBytes, `/fis-api/service-bucket/${lookup.handle}/${parts[1]}/content/${parts[2]}`, currIdentity!);
+
+    const tParts = parts[2].split("#");
+    const encSecret = tParts.length > 1 ? tParts[1] : null;
+    let data: Uint8Array;
+    if (encSecret == null)
+        data = _data;
+    else
+        data = await symmDecryptBytesRaw(_data, encSecret);
 
     // Create Blob URL
     const blob = new Blob([data as BlobPart], { type: details.contentType });
@@ -503,49 +546,66 @@ export interface LocalMember {
     isFriendsRn?: boolean;
 }
 
+export interface LocalDmChat {
+    member: LocalMember;
+    msgs: LocalChatMessage[];
+    oldLimitReached: boolean;
+}
+
 export async function checkAllFriendStuff() {
     await checkReceivedFriendRequests();
     await checkSentFriendRequests();
     await checkFriendList();
 }
 
-// TODO: go through each received friend request and see if any of them match our Sent Friend Request Table
-// if yes, remove them from both Tables and add to Friend Table
 export async function checkReceivedFriendRequests() {
     await prepIfNeeded();
 
-    // Get Sent Requests
-    const sentRequests: string[] = [];
-    {
-        const query: TableSelectDto = {colNames: ["handle"]};
-        const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableSentFriendRequests!.tableUuid!, query);
-        for (const row of res.rows)
-            sentRequests.push(row[0] as string);
-    }
+    // const tUuid = crypto.randomUUID().substring(0, 4);
 
-    // Get Received Requests
-    const receivedRequests: string[] = [];
-    {
-        const query: TableSelectDto = {colNames: ["handle"]};
-        const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableFriendRequests!.tableUuid!, query);
-        for (const row of res.rows)
-            receivedRequests.push(row[0] as string);
-    }
+    // Lock Table
+    // console.log("B1> " + tUuid+ " ACQUIRE LOCK TOKEN");
+    const lockToken = await lockTableEntry(currIdentity!, serviceEntry!.uuid, tableSentFriendRequests!.tableUuid!, true, true);
+    // console.log(" B2> " + tUuid+ " ACQUIRED LOCK TOKEN: " + lockToken);
 
-    // Check if we received any that we sent
-    for (const handle of receivedRequests) {
-        if (!sentRequests.includes(handle))
-            continue;
-
-        await addAsFriend(handle);
-
-        // Send Update if needed
-        const info = await findPublicDataForHandle(handle, await getBaseServerUrl());
-        if (info) {
-            // Send Update Friends
-            await postAuth(`${info.serverUrl}/api/priv/update-friends/${handle}`, "");
-
+    try {
+        // Get Sent Requests
+        const sentRequests: string[] = [];
+        {
+            const query: TableSelectDto = {colNames: ["handle"]};
+            const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableSentFriendRequests!.tableUuid!, query, lockToken);
+            for (const row of res.rows)
+                sentRequests.push(row[0] as string);
         }
+
+        // Get Received Requests
+        const receivedRequests: string[] = [];
+        {
+            const query: TableSelectDto = {colNames: ["handle"]};
+            const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableFriendRequests!.tableUuid!, query);
+            for (const row of res.rows)
+                receivedRequests.push(row[0] as string);
+        }
+
+        // Check if we received any that we sent
+        for (const handle of receivedRequests) {
+            if (!sentRequests.includes(handle))
+                continue;
+
+            await addAsFriend(handle, lockToken);
+
+            // Send Update if needed
+            const info = await findPublicDataForHandle(handle, await getBaseServerUrl(), false);
+            if (info) {
+                // Send Update Friends
+                await postAuth(`${info.serverUrl}/api/priv/update-friends/${handle}`, "");
+
+            }
+        }
+    } finally {
+        // console.log("  B3> " + tUuid+ " RELEASING LOCK TOKEN: " + lockToken);
+        await unlockTableEntry(currIdentity!, serviceEntry!.uuid, tableSentFriendRequests!.tableUuid!, true, true, lockToken);
+        // console.log("   B4> " + tUuid+ " RELEASED LOCK TOKEN: " + lockToken);
     }
 }
 
@@ -584,13 +644,18 @@ export async function checkFriendList() {
     // }
 }
 
-async function addAsFriend(memberHandle: string) {
+async function addAsFriend(memberHandle: string, sentLockToken: string | null) {
     await prepIfNeeded();
     // Add to Friends Table
     // Add to Sent Friend Request Table
+
+    let nick = prompt("Enter a nickname for " + memberHandle);
+    if (nick == "")
+        nick = null;
+
     await insertIntoTable(currIdentity!, serviceEntry!.uuid, tableFriendList!.tableUuid!, {
         "handle": memberHandle,
-        "nickname": prompt("Enter a nickname for " + memberHandle),
+        "nickname": nick,
     });
 
     // Remove from Sent & Received Table
@@ -604,10 +669,9 @@ async function addAsFriend(memberHandle: string) {
         }
     };
     await deleteFromTable(currIdentity!, serviceEntry!.uuid, tableFriendRequests!.tableUuid!, query);
-    await deleteFromTable(currIdentity!, serviceEntry!.uuid, tableSentFriendRequests!.tableUuid!, query);
+    await deleteFromTable(currIdentity!, serviceEntry!.uuid, tableSentFriendRequests!.tableUuid!, query, sentLockToken);
 }
 
-// TODO: remove from Friends Table
 async function removeFriend(handle: string) {
     await prepIfNeeded();
 // Remove from Friends Table
@@ -634,7 +698,7 @@ export async function unfriend(member: LocalMember) {
     } catch (e) {
         if (member.isFriendsRn)
             throw e;
-        console.log("Silent Unfriend Error Catch:", e);
+        console.debug("Silent Unfriend Error Catch:", e);
     }
 }
 
@@ -670,6 +734,8 @@ export async function sendFriendRequest(member: LocalMember) {
     // Send Friend Request
     await postAuth(`${member.serverUrl}/api/priv/friend-request/${member.handle}`, "");
 
+    // TODO: Handle Already friends
+
     // Add to Sent Friend Request Table
     await insertIntoTable(currIdentity!, serviceEntry!.uuid, tableSentFriendRequests!.tableUuid!, {
         "handle": member.handle,
@@ -694,7 +760,7 @@ export async function actOnReceivedFriendRequests(member: LocalMember, action: "
 
         // TODO: Implement "DENY" ?
     } else if (action === "ACCEPT") {
-        await addAsFriend(member.handle);
+        await addAsFriend(member.handle, null);
 
         // Send Friend Request
         await postAuth(`${member.serverUrl}/api/priv/friend-request/${member.handle}`, "");
@@ -743,7 +809,7 @@ export async function getFriendRequestList(): Promise<LocalMember[]> {
     const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableFriendRequests!.tableUuid!, query);
     const list: LocalMember[] = [];
     for (const row of res.rows) {
-        const info = await findPublicDataForHandle(row[0] as string, await getBaseServerUrl());
+        const info = await findPublicDataForHandle(row[0] as string, await getBaseServerUrl(), false);
         if (info) {
             list.push({
                 handle: row[0] as string,
@@ -754,6 +820,201 @@ export async function getFriendRequestList(): Promise<LocalMember[]> {
         }
     }
     return list;
+}
+
+export async function checkReceivedDms() {
+    await prepIfNeeded();
+
+    // Lock Table
+    const lockToken = await lockTableEntry(currIdentity!, serviceEntry!.uuid, tableReceivedDms!.tableUuid!, true, true);
+
+    try {
+        // Get the oldest messages first
+        const bQuery: TableBasicQueryDto = {
+            sortByCols: ["timestamp"],
+            sortOrders: ["ASC"]
+        };
+
+        const query: TableSelectDto = {
+            colNames: ["uuid", "timestamp", "msg_json", "sender_handle"],
+            basicQuery: bQuery
+        };
+
+        // Load Messages
+        const kp = await getKeypair();
+        const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableReceivedDms!.tableUuid!, query, lockToken);
+        for (const row of res.rows) {
+            try {
+                // Decrypt message
+                const dec: DmSendMessage = await asymmDecryptObj(row[2] as string, kp.priv);
+                // console.log("DECRYPTED MSG", dec);
+
+                // Get Handle
+                const senderHandle = row[3] as string;
+
+                // Get Handle info
+                const lookup: IrcHandleLookupDto = await lookUpHandle(senderHandle, await getBaseServerUrl());
+                if (lookup == null) {
+                    console.error("Lookup failed for: " + senderHandle);
+                    continue;
+                }
+
+                // Validate
+                const valid = await asymmVerifyObj(dec.msgObj, dec.sig, parsePublicSplitKey(lookup.pubKey));
+                if (!valid)
+                    console.warn(`Invalid signature for message from ${senderHandle}: `, dec, lookup);
+
+                // Add it to local DB
+                const dmDb: DmDbMessage = {
+                    msgObj: dec.msgObj,
+                    sig: dec.sig,
+                    sigValid: valid,
+                    handle: senderHandle,
+                    isRealMessage: true
+                };
+
+                // TODO: Rewrite to use bulk inserts!
+                await addToDmTable(dmDb, row[0] as string, new Date(row[1] as number), senderHandle);
+            } catch (e) {
+                console.error(`Failed to decrypt Received DM: `, row, e);
+            }
+        }
+
+        // remove from received dms
+        await deleteFromTable(currIdentity!, serviceEntry!.uuid!, tableReceivedDms!.tableUuid!, {}, lockToken);
+    } finally {
+        // Unlock Table
+        await unlockTableEntry(currIdentity!, serviceEntry!.uuid, tableReceivedDms!.tableUuid!, true, true, lockToken);
+    }
+}
+
+export async function addToDmTable(msg: DmDbMessage, uuid: string, timestamp: Date, chatHandle: string) {
+    await prepIfNeeded();
+
+    const secretKey = await secretSymmKeyFromFullKey(await getKeypair());
+    const enc = await symmEncryptObj(msg, secretKey);
+
+    const insertObj = {
+        "msg_json": enc,
+        "uuid": uuid,
+        "timestamp": timestamp.valueOf(),
+        "chat_handle": chatHandle
+    };
+
+    await insertIntoTable(currIdentity!, serviceEntry!.uuid!, tableDms!.tableUuid!, insertObj);
+}
+
+// Loads Dm Chat
+export async function loadDmsChat(dmChat: LocalDmChat, loadMode: "INITIAL_LOAD" | "LOAD_OLDER" | "LOAD_NEWER"): Promise<LocalDmChat> {
+    await prepIfNeeded();
+
+    // Get the newest messages first
+    const bQuery: TableBasicQueryDto = {
+        sortByCols: ["timestamp"],
+        sortOrders: ["DESC"],
+        limit: 50,
+    };
+
+    // Where Part for correct chat
+    const chatFilterPart: TableWhereConditionPart = {
+        type: "C_EQ",
+        conditionParts: [
+            {type: "COL", colName: "chat_handle"},
+            {type: "VAL", valueType: "FIXED_STRING_N", value: dmChat.member.handle}
+        ]
+    }
+
+    // Safety Guard
+    if (loadMode != "INITIAL_LOAD" && dmChat.msgs.length == 0)
+        loadMode = "INITIAL_LOAD";
+
+    // Set Where query + extra
+    if (loadMode === "LOAD_NEWER") {
+        let idx = dmChat.msgs.length - 5;
+        if (idx < 0)
+            idx = 0;
+        const newestMsg = dmChat.msgs[idx];
+        bQuery.where = {type: "L_AND", conditionParts: [chatFilterPart, {
+            type: "C_GT",
+            conditionParts: [
+                {type: "COL", colName: "timestamp"},
+                {type: "VAL", valueType: "BIGINT", value: newestMsg.timestamp.valueOf()}
+            ]}]}
+    } else if (loadMode === "LOAD_OLDER") {
+        const oldestMsg = dmChat.msgs[0];
+        bQuery.where = {type: "L_AND", conditionParts: [chatFilterPart, {
+                type: "C_LT",
+                conditionParts: [
+                    {type: "COL", colName: "timestamp"},
+                    {type: "VAL", valueType: "BIGINT", value: oldestMsg.timestamp.valueOf()}
+                ]}]}
+    } else if (loadMode === "INITIAL_LOAD") {
+        bQuery.where = chatFilterPart;
+    }
+
+    const query: TableSelectDto = {
+        colNames: ["uuid", "timestamp", "msg_json"],
+        basicQuery: bQuery
+    };
+
+    // Load Messages
+    const secretKey = await secretSymmKeyFromFullKey(await getKeypair());
+    const res = await queryTable(currIdentity!, serviceEntry!.uuid!, tableDms!.tableUuid!, query);
+    const msgList: LocalChatMessage[] = [];
+    for (const row of res.rows) {
+        // Decrypt
+        const dec: DmDbMessage = await symmDecryptObj(row[2] as string, secretKey);
+
+        // Create msg object
+        const msg: LocalChatMessage = {
+            msgObj: dec.msgObj,
+            handle: dec.handle,
+            timestamp: new Date(row[1] as number),
+            uuid: row[0] as string,
+            sig: dec.sig,
+            sigValid: dec.sigValid,
+            isRealMessage: dec.isRealMessage
+        };
+
+        msgList.push(msg);
+    }
+
+    // Reverse Result list (have oldest first)
+    msgList.reverse();
+
+    // Create Result Obj
+    const resChat: LocalDmChat = {
+        member: dmChat.member,
+        msgs: dmChat.msgs,
+        oldLimitReached: (loadMode === "LOAD_NEWER") ? dmChat.oldLimitReached : !res.resultTruncated
+    }
+
+    // Load messages correctly
+    if (loadMode === "LOAD_NEWER") {
+        const filtered = msgList.filter((m) => resChat.msgs.findIndex((o) => o.uuid == m.uuid) == -1);
+        const maybeUnsorted = resChat.msgs.concat(filtered);
+        resChat.msgs = keepLastXSorted(maybeUnsorted, 30, (a: LocalChatMessage, b: LocalChatMessage) => a.timestamp.valueOf() - b.timestamp.valueOf());
+    }
+    else if (loadMode === "LOAD_OLDER")
+        resChat.msgs = msgList.concat(resChat.msgs);
+    else if (loadMode === "INITIAL_LOAD")
+        resChat.msgs = msgList;
+
+    // console.log("New loaded Chat: ", resChat);
+    return resChat;
+}
+
+function keepLastXSorted<T>(arr: T[], x: number, compareFn: (a: T, b: T) => number) {
+    const n = arr.length;
+    if (n <= 1)
+        return arr;
+
+    const take = Math.min(x, n);
+    const start = n - take;
+
+    const last = arr.slice(start).sort(compareFn);
+    arr.splice(start, take, ...last);
+    return arr;
 }
 
 export function compStrArrays(oldArr: string[], newArr: string[]): { identical: boolean; addedValues: string[]; removedValues: string[] } {
