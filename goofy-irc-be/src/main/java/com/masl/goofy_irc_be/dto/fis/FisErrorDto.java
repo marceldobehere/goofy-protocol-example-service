@@ -13,8 +13,6 @@ import java.util.Map;
 @AllArgsConstructor
 public class FisErrorDto {
     @NotNull
-    public Integer httpCode;
-    @NotNull
     public Integer errorCode;
     @NotNull
     public String message;

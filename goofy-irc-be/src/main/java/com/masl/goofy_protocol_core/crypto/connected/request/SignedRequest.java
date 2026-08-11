@@ -8,9 +8,8 @@ import com.masl.goofy_protocol_core.crypto.isolated.asymm.GlobAsymmCrypto;
 
 import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.regex.Pattern;
 
 import static com.masl.goofy_protocol_core.crypto.connected.GenericHandleCrypto.DEF_DOMAIN_SEPARATOR;
 
@@ -122,7 +121,22 @@ public record SignedRequest(
         );
     }
 
-    public static boolean hasAllRequestHeaders(Map<String, String> headers) {
+    public static Map<String, String> fixHeaderCasing(Map<String, String> input) {
+        Map<String, String> result = new HashMap<>();
+        for (var entry : input.entrySet()) {
+            String newName = String.join("-",
+                    Arrays.stream(entry.getKey().toLowerCase(Locale.ROOT)
+                                    .split(Pattern.quote("-")))
+                            .map(s -> s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1))
+                            .toArray(String[]::new)
+            );
+            result.put(newName, entry.getValue());
+        }
+        return result;
+    }
+
+    public static boolean hasAllRequestHeaders(Map<String, String> _headers) {
+        var headers = fixHeaderCasing(_headers);
         return (headers.containsKey("X-Goofy-Public-Key") || headers.containsKey("X-Goofy-Handle")) &&
                 headers.containsKey("X-Goofy-Signature") &&
                 headers.containsKey("X-Goofy-Id") &&
@@ -130,9 +144,11 @@ public record SignedRequest(
     }
 
     // This just constructs the object, it still needs to be validated!
-    public static SignedRequest fromRequestHeaders(Map<String, String> headers, String method, String path, byte[] body, GenericHandleCrypto handleCrypto) throws PubSplitKeyNotFound {
+    public static SignedRequest fromRequestHeaders(Map<String, String> _headers, String method, String path, byte[] body, GenericHandleCrypto handleCrypto) throws PubSplitKeyNotFound {
         if (body == null || body.length == 0)
             body = EMPTY_BODY_VAL;
+
+        var headers = fixHeaderCasing(_headers);
 
         // Get Headers
         String pubSplitKey = headers.get("X-Goofy-Public-Key");

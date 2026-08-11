@@ -101,6 +101,7 @@ public class FriendEndpoint {
 
         // Notify User
         wsService.trySendMessage(user.getHandle(), new WsNewFriendReq());
+        wsService.trySendMessage(auth.getHandle(), new WsNewFriendReq());
     }
 
     // Am Friends?
@@ -131,11 +132,12 @@ public class FriendEndpoint {
         if (!isFriends(auth.getHandle(), user))
             throw new NotFriends(handle);
 
-        // Insert Friend Request
-        insertFisTable(Map.of("msg_json", msgObj, "uuid", UUID.randomUUID().toString()), user, user.getReceivedDmsTablePath());
+        // Insert DM
+        insertFisTable(Map.of("msg_json", msgObj, "uuid", UUID.randomUUID().toString(), "timestamp", Instant.now().toEpochMilli(), "sender_handle", auth.getHandle()), user, user.getReceivedDmsTablePath());
 
         // Notify User
         wsService.trySendMessage(user.getHandle(), new WsNewDm(auth.getHandle()));
+        wsService.trySendMessage(auth.getHandle(), new WsNewDm(user.getHandle()));
     }
 
     // Update Friends List (e.g. bc accepted)
@@ -154,6 +156,7 @@ public class FriendEndpoint {
 
         // Notify User
         wsService.trySendMessage(user.getHandle(), new WsNewFriendReq());
+        wsService.trySendMessage(auth.getHandle(), new WsNewFriendReq());
     }
 
     // Unfriend
@@ -175,6 +178,7 @@ public class FriendEndpoint {
 
         // Notify User
         wsService.trySendMessage(user.getHandle(), new WsNewFriendReq());
+        wsService.trySendMessage(auth.getHandle(), new WsNewFriendReq());
     }
 
     private boolean hasSentFriendRequest(String extHandle, User user) throws UserFisLookupFailed, FisRequestError, FisRequestValidationError {

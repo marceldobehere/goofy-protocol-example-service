@@ -36,6 +36,7 @@ ENTRYPOINT ["/bin/sh","-c", "set -e; \
      -password pass:$KEYSTORE_PASSWORD; \
    exec java -jar /app/app.jar \
      --spring.profiles.active=${SPRING_PROFILES_ACTIVE:-dev} \
+     --server.http2.enabled=true \
      --server.ssl.enabled=true \
      --server.ssl.key-store=${KEYSTORE_PATH} \
      --server.ssl.key-store-password=${KEYSTORE_PASSWORD} \

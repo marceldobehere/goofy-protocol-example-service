@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -35,6 +36,8 @@ public class FisReqService {
         this.validator = validator;
     }
 
+    private static final int FIS_SERVICE_TABLE_LOCKED = 2_008_002;
+
     public byte[] performFisRequest(HttpMethod method, String fisDomain, String path, byte[] body, Map<String, String> headers) {
         if (headers == null)
             headers = Map.of();
@@ -53,9 +56,14 @@ public class FisReqService {
                         .body(body)
                         .retrieve()
                         .body(byte[].class);
-            } catch (Exception _) {
-                // System.err.println("Failed to perform request to FIS: " + method.name() + " " + protocol + fisDomain + path + "   -> REASON: " + e.getMessage());
-            }
+            } catch (RestClientResponseException e) {
+                byte[] res = e.getResponseBodyAsByteArray();
+                try {
+                    FisErrorDto errDto = mapper.readValue(res, FisErrorDto.class);
+                    if (validator.validate(errDto).isEmpty())
+                        return res;
+                } catch (Exception _) {}
+            } catch (Exception _) {}
         }
         return null;
     }
@@ -90,12 +98,16 @@ public class FisReqService {
             // Attempt to parse error
             try {
                 FisErrorDto errDto = mapper.readValue(responseBytes, FisErrorDto.class);
-                if (validator.validate(errDto, FisErrorDto.class).isEmpty())
-                    errDto.throwFisErr();
+                if (validator.validate(errDto).isEmpty()) {
+                    if (errDto.errorCode == FIS_SERVICE_TABLE_LOCKED) {
+                        shortSleep();
+                        return performSignedRequest(returnType, method, fisDomain, path, body, extraHeaders);
+                    } else
+                        errDto.throwFisErr();
+                }
             } catch (FisRequestError e) {
                 throw e;
-            } catch (Exception _) {
-            }
+            } catch (Exception _) {}
 
             // Check if return type is something like String, or byte[] and return it directly
             if (returnType == byte[].class)
@@ -131,6 +143,14 @@ public class FisReqService {
             return true;
         } catch (JacksonException _) {
             return false;
+        }
+    }
+
+    private void shortSleep() {
+        try {
+            Thread.sleep((int)(Math.random() * 500) + 200);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 }
