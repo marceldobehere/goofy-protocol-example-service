@@ -599,7 +599,6 @@ export async function checkReceivedFriendRequests() {
             if (info) {
                 // Send Update Friends
                 await postAuth(`${info.serverUrl}/api/priv/update-friends/${handle}`, "");
-
             }
         }
     } finally {

@@ -45,6 +45,7 @@ export default function Page() {
 
     const msgHandler = useRef(handleMessage);
     const chatUl = useRef<HTMLUListElement>(null);
+    const textArea = useRef<HTMLTextAreaElement>(null);
 
     // Creates a Server Entry and sets up the WS
     async function createServerEntry(serverUrl: string, serverName: string): Promise<LocalServerData> {
@@ -233,6 +234,7 @@ export default function Page() {
 
         await unfriend(member);
         await getMembersAndDmsAndFriendRequests();
+        await postAuth(`/api/priv/update-friends/${GlobalState.handle}`, "");
     }
 
     async function openFriendDm(member: LocalMember) {
@@ -245,6 +247,10 @@ export default function Page() {
             // console.log("Opened Chat: ", res);
             setCurrChat(res);
             setTimeout(() => {
+                if (textArea.current != null) {
+                    textArea.current.disabled = false;
+                    textArea.current.focus();
+                }
                 chatUl.current?.scrollTo({top: chatUl.current.scrollHeight, behavior: "smooth"});
             }, 350);
         } catch (e) {
@@ -258,51 +264,76 @@ export default function Page() {
         if (currentMsgText.trim() == "" || currChat == null)
             return;
 
-        const msg: ChatMessageDto = {
-            msg: currentMsgText.trim(),
-            filePaths: []
-        }
-        await doSendMsg(msg, currChat);
+        if (textArea.current != null)
+            textArea.current.disabled = true;
 
-        setCurrentMsgText("");
+        try {
+            const msg: ChatMessageDto = {
+                msg: currentMsgText.trim(),
+                filePaths: []
+            }
+            await doSendMsg(msg, currChat);
+
+            setCurrentMsgText("");
+        } catch (e) {
+            console.error(e);
+            alert(`Failed to send PasteMessage: ${e}`);
+        } finally {
+            if (textArea.current != null) {
+                textArea.current.disabled = false;
+                textArea.current.focus();
+            }
+        }
     }
 
     async function sendPasteMessage(e: ClipboardEvent) {
         const _files = e.clipboardData?.files;
         if (_files == null || _files.length === 0)
             return;
+        const files = Array.from(_files);
         // console.debug("Files Pasted: ", files);
-        if (currChat == null || !confirm(`Are you sure you want to upload \"${_files[0].name}\" to the current chat?\nIt will also send this text: ${currentMsgText.trim()}`))
+        if (currChat == null || !confirm(`Are you sure you want to upload \"${files[0].name}\" to the current chat?\nIt will also send this text: ${currentMsgText.trim()}`))
             return;
 
-        const files = Array.from(_files);
+        if (textArea.current != null)
+            textArea.current.disabled = true;
 
-        const pubInfo = await lookUpHandle(currChat.member.handle, currChat.member.serverUrl);
-        const pubKey = parsePublicSplitKey(pubInfo.pubKey);
+        try {
+            const pubInfo = await lookUpHandle(currChat.member.handle, currChat.member.serverUrl);
+            const pubKey = parsePublicSplitKey(pubInfo.pubKey);
 
-        const filePaths: string[] = [];
-        for (const file of files) {
-            try {
-                const res = await uploadFisData(file, pubKey);
-                if (res == null) {
-                    alert(`Failed to upload file ${file.name}.`);
+            const filePaths: string[] = [];
+            for (const file of files) {
+                try {
+                    const res = await uploadFisData(file, pubKey);
+                    if (res == null) {
+                        alert(`Failed to upload file ${file.name}.`);
+                        return;
+                    }
+                    filePaths.push(res);
+                } catch (e) {
+                    alert(`Failed to upload file ${file.name}.\nError: ${(e as Error).message}`);
                     return;
                 }
-                filePaths.push(res);
-            } catch (e) {
-                alert(`Failed to upload file ${file.name}.\nError: ${(e as Error).message}`);
-                return;
+            }
+
+            // console.debug("Uploaded Files: ", filePaths);
+            const msg: ChatMessageDto = {
+                msg: currentMsgText.trim(),
+                filePaths
+            }
+            await doSendMsg(msg, currChat);
+
+            setCurrentMsgText("");
+        } catch (e) {
+            console.error(e);
+            alert(`Failed to send PasteMessage: ${e}`);
+        } finally {
+            if (textArea.current != null) {
+                textArea.current.disabled = false;
+                textArea.current.focus();
             }
         }
-
-        // console.debug("Uploaded Files: ", filePaths);
-        const msg: ChatMessageDto = {
-            msg: currentMsgText.trim(),
-            filePaths
-        }
-        await doSendMsg(msg, currChat);
-
-        setCurrentMsgText("");
     }
 
     async function doSendMsg(msg: ChatMessageDto, chat: LocalDmChat) {
@@ -443,7 +474,7 @@ export default function Page() {
                     <div className={styles.MainChatInput}>
                         {/*Stupid ass fix for some reason this works but using the disabled property directly doesn't*/}
                         {currChat == null ? (<></>) : (<>
-                            <textarea value={currentMsgText} placeholder={"Enter a message or paste a file"} onChange={(e) => {
+                            <textarea ref={textArea} value={currentMsgText} placeholder={"Enter a message or paste a file"} onChange={(e) => {
                                 setCurrentMsgText(e.target.value);
                             }} onKeyDown={(e) => {
                                 // Seems to not trigger on mobile?
