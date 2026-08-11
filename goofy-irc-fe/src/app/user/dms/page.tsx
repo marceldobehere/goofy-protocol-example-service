@@ -132,7 +132,7 @@ export default function Page() {
         setAllFriends(frens);
         setAllFriendRequests(await getFriendRequestList());
 
-        console.log("CHECK FRIEND STUFF", currChat, frens, frens.filter((f) => f.handle == currChat?.member.handle).length)
+        // console.log("CHECK FRIEND STUFF", currChat, frens, frens.filter((f) => f.handle == currChat?.member.handle).length)
         if (frens.filter((f) => f.handle == currChat?.member.handle).length == 0)
             setCurrChat(null);
     }
