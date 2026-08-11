@@ -143,7 +143,7 @@ public class FriendEndpoint {
     // Update Friends List (e.g. bc accepted)
     @PostMapping("/update-friends/{handle}")
     @PreAuthorize("hasRole('ROLE_OUTSIDE_ENTITY')")
-    @IrcEndpoint(summary = "Sends a friend a DM")
+    @IrcEndpoint(summary = "Notifies a Friend / Yourself to update the Friend List")
     public void updateFriends(@PathVariable String handle, @AuthenticationPrincipal GoofyAuthUser auth) throws NotFriends, UserNotFound, UserFisLookupFailed, FisRequestError, FisRequestValidationError {
         // Find User
         User user = userRepository.findByHandle(handle);
@@ -151,12 +151,13 @@ public class FriendEndpoint {
             throw new UserNotFound(handle);
 
         // Check if not friends
-        if (!isFriends(auth.getHandle(), user))
+        if (!auth.getHandle().equals(user.getHandle()) && !isFriends(auth.getHandle(), user))
             throw new NotFriends(handle);
 
         // Notify User
         wsService.trySendMessage(user.getHandle(), new WsNewFriendReq());
-        wsService.trySendMessage(auth.getHandle(), new WsNewFriendReq());
+        if (!auth.getHandle().equals(user.getHandle()))
+            wsService.trySendMessage(auth.getHandle(), new WsNewFriendReq());
     }
 
     // Unfriend
