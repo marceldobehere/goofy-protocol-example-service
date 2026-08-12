@@ -26,7 +26,7 @@ public class RootEndpoint {
         URI redirectUri = UriComponentsBuilder
                 .fromUriString(generalProperties.getFrontendUrl())
                 .queryParam("overrideBackendUrl", generalProperties.getUrl())
-                .build(true)
+                .build(false)
                 .toUri();
 
         return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT)
