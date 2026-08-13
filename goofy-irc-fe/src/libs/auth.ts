@@ -3,7 +3,7 @@
 import {ExportIdentityKeypair, GeneralInfoDto, IrcHandleLookupDto, MyUserInfoDto} from "@/libs/dtos";
 import {getAuth, getNoAuth, putAuth} from "@/libs/req";
 import {getBaseServerUrl, getKeypair, hasKeypair, saveKeypair} from "@/libs/auth-store";
-import {deriveHandleFromPublicSplitKey, parseFullKeypair} from "@/libs/crypto";
+import {deriveHandleFromPublicSplitKey, parseFullKeypair, parsePublicSplitKey, verifyKeyAndHandle} from "@/libs/crypto";
 import {goPath} from "@/libs/go-path";
 import {readJsonFile, uploadData} from "@/libs/file-utils";
 import {AsymmFullKeyPair} from "@/libs/crypto-types";
@@ -118,7 +118,14 @@ export async function lookUpHandle(handle: string, serverUrl: string | null = nu
         return entry;
 
     const lookup: IrcHandleLookupDto = await getNoAuth(`${serverUrl}/api/user/lookup/${handle}`);
-    // TODO: Verify
+
+    // Verify
+    const valid = await verifyKeyAndHandle(parsePublicSplitKey(lookup.pubKey), lookup.handle);
+    if (!valid) {
+        alert(`Public Key & Handle mismatch for: ${handle}!`)
+        throw new Error(`Public Key & Handle mismatch for: ${handle}!!!`);
+    }
+
     lookUpMap.set(handle, lookup);
     return lookup;
 }
