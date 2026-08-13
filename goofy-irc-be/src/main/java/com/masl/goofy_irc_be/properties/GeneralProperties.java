@@ -24,4 +24,9 @@ public class GeneralProperties {
         int port = uri.getPort();
         return (port == -1) ? host : host + ":" + port;
     }
+
+    public String getDomainHost() {
+        URI uri = URI.create(url);
+        return uri.getHost();
+    }
 }
