@@ -1,18 +1,18 @@
 # Build
-FROM maven:3.9.16-amazoncorretto-25 AS build
+FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /app
 
 COPY pom.xml .
 RUN mvn -q -DskipTests dependency:go-offline
 COPY src ./src
-
-# Build the fat jar (Spring Boot plugin usually creates it)
 RUN mvn -q -DskipTests clean package
 
-
 # Runtime
-FROM amazoncorretto:25
-RUN yum -y update && yum -y install openssl && yum clean all
+FROM eclipse-temurin:25-jre
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY --from=build /app/target/*.jar /app/app.jar
 
